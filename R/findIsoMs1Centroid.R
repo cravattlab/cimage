@@ -5,20 +5,20 @@ input.file.base <- "test_cen"
 input.file.suffix <-".mzXML"
 output.path <- paste(input.path,"xcms_cen_plot/",sep="")
 output.file.base <- paste(input.file.base,"doublet",sep="_")
-output.fifle.suffix <- ".png"
+output.file.suffix <- ".png"
 
 filename <- paste(input.path, input.file.base, input.file.suffix, sep="")
 xfile <- xcmsRaw( filename, profstep=0 )
 
-xpeaks <- findPeaks(xfile,method="centWave", ppm=25, snthresh=2.0,minptsperpeak=2)
+xpeaks <- findPeaks(xfile,method="centWave", ppm=25, snthresh=2.0,minptsperpeak=5)
 num.peaks <- dim(xpeaks)[1]
 rownames(xpeaks) <- seq(1, num.peaks)
 
 # sort the matrix by retention time first
 xpeaks <- xpeaks[order(xpeaks[,"rt"]), ]
 
-# within 5 sec of retention window
-rt.cut <- 5.0
+# within 10sec of retention window
+rt.cut <- 10.0
 
 mz.ppm.cut <- 0.00002 # 20ppm
 # From Eranthie's isotopically labeled probe
@@ -31,13 +31,14 @@ charge.states <- seq(1,5)
 intensity.tag <- "maxo" #
 intensity.ratio.range <- c(0.5,2.0) # ratio of intensity of heavy and light peaks
 
-
 # make a fresh empty list
 n.nonredundant.hit <- 0
 pair.list <- NULL
 
 for ( rt in levels(factor(xpeaks[,"rt"])) ) {
-  this.rt <- factor(xpeaks[,"rt"]) == rt
+#  rt.range <- c( as.numeric(rt)-rt.cut, as.numeric(rt)+rt.cut)
+#  this.rt <- (xpeaks[,"rt"] > rt.range[1]) & (xpeaks[,"rt"] < rt.range[2] )
+  this.rt <- factor(xpeaks[,"rt"])==rt
   if ( sum(this.rt) <= 1 ) next
   # get all peaks with this retension time and sort by mz
   xpeaks.this.rt <- xpeaks[this.rt,]
@@ -111,47 +112,56 @@ for ( rt in levels(factor(xpeaks[,"rt"])) ) {
 }
 pair.matrix <- matrix(pair.list, ncol=4, byrow=TRUE)
 colnames(pair.matrix) <- c("idx1", "idx2", "charge", "hit.id")
+pair.matrix <- data.frame( pair.matrix )
 
 rt.window.per.scan <- 6.0 # time elapse per ms1 scan
 mass.window <- 2.0 # plot 10.0 m/z unit from center of delected peak
 num.ms2.per.ms1 <- 18
-for ( i in 1:dim(pair.matrix)[1] ) {
-  peak.index1 <- pair.matrix[i,1]
-  peak.index2 <- pair.matrix[i,2]
-  charge <- pair.matrix[i,3]
-  hit.id <- pair.matrix[i,4]
+for ( id in levels(factor(pair.matrix[,"hit.id"])) ) {
+  pair.matrix.this.id <- pair.matrix[ pair.matrix[,"hit.id"]==id, ]
+  if ( dim(pair.matrix.this.id)[1] > 1) {
+    prefix <- "M_"
+  } else {
+    prefix <- "S_"
+  }
+  for ( i in 1:dim(pair.matrix.this.id)[1] ) {
+    peak.index1 <- as.character(pair.matrix.this.id[i,1])
+    peak.index2 <- as.character(pair.matrix.this.id[i,2])
+    charge <- pair.matrix.this.id[i,3]
+    hit.id <- pair.matrix.this.id[i,4]
 
-  rt <- ( xpeaks[peak.index1,"rt"] + xpeaks[peak.index2,"rt"] ) / 2.0
-  rt.range <- c( rt-rt.window.per.scan, rt+rt.window.per.scan)
-  peak.mz1 <- xpeaks[ peak.index1, "mz"]
-  peak.mz2 <- xpeaks[ peak.index2, "mz"]
-  peak.maxo1 <- xpeaks[ peak.index1, "maxo"]
-  peak.maxo2 <- xpeaks[ peak.index2, "maxo"]
-  mass <- (peak.mz1+peak.mz2) / 2.0
-  mass.range <- c(peak.mz1 - mass.window, peak.mz2 + mass.window)
-  raw.EIC.data <- rawEIC(xfile, massrange=mass.range, timerange=rt.range)
-  best.scan.number <- raw.EIC.data$scan[ order(raw.EIC.data$intensity)[length(raw.EIC.data$intensity)] ]
-  out.filename <- paste( output.path, output.file.base, "_", i, output.file.suffix, sep="")
-  # make plot for each individual hit
-  png(out.filename)
-  par(mfrow=c(2,1))
-  # mz spectrum top
-  plotScan(xfile, best.scan.number, massrange=mass.range)
-  scan.data <- getScan(xfile, best.scan.number, massrange=mass.range)
-  #ylimit <- c(0, max( peak.maxo1, peak.maxo2) * 1 )
-  #plot( scan.data[,1], scan.data[,2], type='h', xlab="m/z", ylab="intensity", ylim=ylimit)
-  title( paste("search charge:",charge,"; raw ms1 #", (best.scan.number-1)*(num.ms2.per.ms1+1)+1), line=0.5)
-  ymark <- min( scan.data[,2] ) + 10
-  points( peak.mz1, ymark, pch=23, col="red",bg="red")
-  points( peak.mz2, ymark, pch=23, col="blue",bg="blue")
+    rt <- ( xpeaks[peak.index1,"rt"] + xpeaks[peak.index2,"rt"] ) / 2.0
+    rt.range <- c( rt-rt.window.per.scan, rt+rt.window.per.scan)
+    peak.mz1 <- xpeaks[ peak.index1, "mz"]
+    peak.mz2 <- xpeaks[ peak.index2, "mz"]
+    peak.maxo1 <- xpeaks[ peak.index1, "maxo"]
+    peak.maxo2 <- xpeaks[ peak.index2, "maxo"]
+    mass <- (peak.mz1+peak.mz2) / 2.0
+    mass.range <- c(peak.mz1 - mass.window, peak.mz2 + mass.window)
+    raw.EIC.data <- rawEIC(xfile, massrange=mass.range, timerange=rt.range)
+    best.scan.number <- raw.EIC.data$scan[ order(raw.EIC.data$intensity)[length(raw.EIC.data$intensity)] ]
+    out.filename <- paste( output.path, prefix, output.file.base, "_", id,"_",i, output.file.suffix, sep="")
+                                        # make plot for each individual hit
+    png(out.filename)
+    par(mfrow=c(2,1))
+                                        # mz spectrum top
+    plotScan(xfile, best.scan.number, massrange=mass.range)
+    scan.data <- getScan(xfile, best.scan.number, massrange=mass.range)
+                                        #ylimit <- c(0, max( peak.maxo1, peak.maxo2) * 1 )
+                                        #plot( scan.data[,1], scan.data[,2], type='h', xlab="m/z", ylab="intensity", ylim=ylimit)
+    title( paste("search charge:",charge,"; raw ms1 #", (best.scan.number-1)*(num.ms2.per.ms1+1)+1), line=0.5)
+    ymark <- min( scan.data[,2] ) + 10
+    points( peak.mz1, ymark, pch=23, col="red",bg="red")
+    points( peak.mz2, ymark, pch=23, col="blue",bg="blue")
   #chromatogram bottom
-  raw.ECI.light <- rawEIC(xfile, c(peak.mz1*(1-mz.ppm.cut), peak.mz1*(1+mz.ppm.cut)) )
-  raw.ECI.heavy <- rawEIC(xfile, c(peak.mz2*(1-mz.ppm.cut), peak.mz2*(1+mz.ppm.cut)) )
-  xlimit <-c( max(0, best.scan.number-25), min(best.scan.number+25, length(raw.ECI.light[[1]]) ) )
-  ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
-  plot(raw.ECI.light[[1]], raw.ECI.light[[2]], type="l", col="red",xlab="scan #", ylab="intensity",
-       main=paste("chromatogram of", as.character(format(peak.mz1, digits=7)),
-         "and", as.character(format(peak.mz2,digits=7)), "m/z"), xlim=xlimit, ylim=ylimit)
-  lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
-  dev.off()
+    raw.ECI.light <- rawEIC(xfile, c(peak.mz1*(1-mz.ppm.cut), peak.mz1*(1+mz.ppm.cut)) )
+    raw.ECI.heavy <- rawEIC(xfile, c(peak.mz2*(1-mz.ppm.cut), peak.mz2*(1+mz.ppm.cut)) )
+    xlimit <-c( max(1, best.scan.number-25), min(best.scan.number+25, length(raw.ECI.light[[1]]) ) )
+    ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
+    plot(raw.ECI.light[[1]], raw.ECI.light[[2]], type="l", col="red",xlab="scan #", ylab="intensity",
+         main=paste("chromatogram of", as.character(format(peak.mz1, digits=7)),
+           "and", as.character(format(peak.mz2,digits=7)), "m/z"), xlim=xlimit, ylim=ylimit)
+    lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
+    dev.off()
+  }
 }
