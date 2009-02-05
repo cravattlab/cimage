@@ -20,7 +20,7 @@ xpeaks <- xpeaks[order(xpeaks[,"rt"]), ]
 # within 10sec of retention window
 rt.cut <- 10.0
 
-mz.ppm.cut <- 0.00002 # 20ppm
+mz.ppm.cut <- 0.000025 # 25ppm
 # From Eranthie's isotopically labeled probe
 pair.mass.delta <- 6.01381
 # nature mass difference between C12 and C13
@@ -115,7 +115,7 @@ colnames(pair.matrix) <- c("idx1", "idx2", "charge", "hit.id")
 pair.matrix <- data.frame( pair.matrix )
 
 rt.window.per.scan <- 6.0 # time elapse per ms1 scan
-mass.window <- 2.0 # plot 10.0 m/z unit from center of delected peak
+mass.window <- 2.0 # plot 2.0 m/z unit from center of delected peak
 num.ms2.per.ms1 <- 18
 for ( id in levels(factor(pair.matrix[,"hit.id"])) ) {
   pair.matrix.this.id <- pair.matrix[ pair.matrix[,"hit.id"]==id, ]
@@ -124,44 +124,96 @@ for ( id in levels(factor(pair.matrix[,"hit.id"])) ) {
   } else {
     prefix <- "S_"
   }
-  for ( i in 1:dim(pair.matrix.this.id)[1] ) {
-    peak.index1 <- as.character(pair.matrix.this.id[i,1])
-    peak.index2 <- as.character(pair.matrix.this.id[i,2])
-    charge <- pair.matrix.this.id[i,3]
-    hit.id <- pair.matrix.this.id[i,4]
+  peaks.mz1 <- xpeaks[ as.character( pair.matrix.this.id[,"idx1"] ), "mz"]
+  peaks.mz2 <- xpeaks[ as.character( pair.matrix.this.id[,"idx2"] ), "mz"]
+  # for plot a specific ms1 scan
+  mass.range <- c( min(peaks.mz1) - mass.window, max(peaks.mz2) + mass.window )
+  # for peak intensity
+  peaks.maxo1 <- xpeaks[ as.character( pair.matrix.this.id[,"idx1"] ), "maxo"]
+  peaks.maxo2 <- xpeaks[ as.character( pair.matrix.this.id[,"idx2"] ), "maxo"]
+  peaks.maxo <- peaks.maxo1 + peaks.maxo2
+  # num of peaks
+  peaks.n <- length( peaks.maxo )
+  # plot chromatogram of the most intense peak, label others under the same envelope
+  i <- order(peaks.maxo)[length(peaks.maxo)]
+  peak.index1 <- as.character(pair.matrix.this.id[i,1])
+  peak.index2 <- as.character(pair.matrix.this.id[i,2])
+  charge <- pair.matrix.this.id[i,3]
 
-    rt <- ( xpeaks[peak.index1,"rt"] + xpeaks[peak.index2,"rt"] ) / 2.0
-    rt.range <- c( rt-rt.window.per.scan, rt+rt.window.per.scan)
-    peak.mz1 <- xpeaks[ peak.index1, "mz"]
-    peak.mz2 <- xpeaks[ peak.index2, "mz"]
-    peak.maxo1 <- xpeaks[ peak.index1, "maxo"]
-    peak.maxo2 <- xpeaks[ peak.index2, "maxo"]
-    mass <- (peak.mz1+peak.mz2) / 2.0
-    mass.range <- c(peak.mz1 - mass.window, peak.mz2 + mass.window)
-    raw.EIC.data <- rawEIC(xfile, massrange=mass.range, timerange=rt.range)
-    best.scan.number <- raw.EIC.data$scan[ order(raw.EIC.data$intensity)[length(raw.EIC.data$intensity)] ]
-    out.filename <- paste( output.path, prefix, output.file.base, "_", id,"_",i, output.file.suffix, sep="")
-                                        # make plot for each individual hit
-    png(out.filename)
-    par(mfrow=c(2,1))
-                                        # mz spectrum top
-    plotScan(xfile, best.scan.number, massrange=mass.range)
-    scan.data <- getScan(xfile, best.scan.number, massrange=mass.range)
-                                        #ylimit <- c(0, max( peak.maxo1, peak.maxo2) * 1 )
-                                        #plot( scan.data[,1], scan.data[,2], type='h', xlab="m/z", ylab="intensity", ylim=ylimit)
-    title( paste("search charge:",charge,"; raw ms1 #", (best.scan.number-1)*(num.ms2.per.ms1+1)+1), line=0.5)
-    ymark <- min( scan.data[,2] ) + 10
-    points( peak.mz1, ymark, pch=23, col="red",bg="red")
-    points( peak.mz2, ymark, pch=23, col="blue",bg="blue")
+  rt <- ( xpeaks[peak.index1,"rt"] + xpeaks[peak.index2,"rt"] ) / 2.0
+  rt.range <- c( rt-rt.window.per.scan, rt+rt.window.per.scan)
+
+  raw.EIC.data <- rawEIC(xfile, massrange=mass.range, timerange=rt.range)
+  best.scan.number <- raw.EIC.data$scan[ order(raw.EIC.data$intensity)[length(raw.EIC.data$intensity)] ]
+  # get actual ms1 scan spectrum
+  scan.data <- getScan(xfile, best.scan.number, massrange=mass.range)
+  scan.mz <- scan.data[,"mz"]
+  scan.int <- scan.data[,"intensity"]
+  peak.mz1 <- peaks.mz1[i]
+  peak.mz2 <- peaks.mz2[i]
+  peak.maxo1 <- scan.int[ abs(scan.mz-peak.mz1) < mz.ppm.cut * peak.mz1 ]
+  peak.maxo2 <- scan.int[ abs(scan.mz-peak.mz2) < mz.ppm.cut * peak.mz2 ]
+  # a very simple way to find the monoisotopic peak
+  isotope.mz.delta <- isotope.mass.unit / as.numeric(as.character(charge))
+  lower.mz <- monoiso.mz <- peak.mz1
+  lower.int <- monoiso.int <- peak.maxo1
+  lower.int.ratio <- 1.0
+  repeat {
+    lower.mz.exist <- abs(scan.mz - monoiso.mz + isotope.mz.delta)/monoiso.mz < mz.ppm.cut
+    if ( sum( lower.mz.exist ) < 1 | lower.int.ratio < 0.5) {
+      # cannot find lower peak any more or intensity not strong enough, finish searching
+      break
+    } else {
+      monoiso.mz <- lower.mz
+      monoiso.int <- lower.int
+      lower.mz <- scan.mz[lower.mz.exist][1]
+      lower.int <- scan.int[lower.mz.exist][1]
+      lower.int.ratio <- lower.int/monoiso.int
+    }
+  } # repeat
+  # simililarly find the largest mz peak in the doublet cluster
+  cluster.max.mz <- peak.mz2
+  repeat {
+    higher.mz.exist <- abs(scan.mz - cluster.max.mz - isotope.mz.delta)/cluster.max.mz < mz.ppm.cut
+    if ( sum( higher.mz.exist ) < 1 ) {
+      # cannot find lower peak any more, finish searching
+      break
+    } else {
+      cluster.max.mz <- scan.mz[higher.mz.exist][1]
+    }
+  } # repeat
+
+  out.filename <- paste(output.path, prefix, output.file.base, "_", id,"_", peaks.n, output.file.suffix, sep="")
+  # make plot for each isotopic cluster
+  png(out.filename)
+  par(mfrow=c(2,1))
+  par(las=0)
+  # mz spectrum top
+  #plotScan(xfile, best.scan.number, massrange=mass.range)
+  ylimit <- c( 0, max(scan.int[(scan.mz>=monoiso.mz&scan.mz<=cluster.max.mz)]) )
+  plot( scan.data[,1], scan.data[,2], type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit)
+  title( paste("Scan # ", best.scan.number, " @ ", round(xfile@scantime[best.scan.number], 1),
+               " sec (raw # ", (best.scan.number-1)*(num.ms2.per.ms1+1)+1, " @ ",
+               round(xfile@scantime[best.scan.number]/60,1)," min)", sep = "")
+        )
+  title( paste("Charge:",charge, "; Monoisotopic mz:", round(monoiso.mz,3),"(M)" ), line=0.5)
+  #ymark <- min( scan.data[,2] ) + 10
+  ymark <- 0
+  #label all identified peaks under this isotopic envelope
+  points( peaks.mz1, rep(ymark, length(peaks.mz1) ), pch=23, col="red",bg="red")
+  points( peaks.mz2, rep(ymark, length(peaks.mz2) ), pch=23, col="blue",bg="blue")
+  points( peak.mz1, peak.maxo1, pch="C", col="red",bg="red")
+  points( peak.mz2, peak.maxo2, pch="C", col="blue",bg="blue")
+  points( monoiso.mz, monoiso.int, pch="M", col="red",bg="red")
   #chromatogram bottom
-    raw.ECI.light <- rawEIC(xfile, c(peak.mz1*(1-mz.ppm.cut), peak.mz1*(1+mz.ppm.cut)) )
-    raw.ECI.heavy <- rawEIC(xfile, c(peak.mz2*(1-mz.ppm.cut), peak.mz2*(1+mz.ppm.cut)) )
-    xlimit <-c( max(1, best.scan.number-25), min(best.scan.number+25, length(raw.ECI.light[[1]]) ) )
-    ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
-    plot(raw.ECI.light[[1]], raw.ECI.light[[2]], type="l", col="red",xlab="scan #", ylab="intensity",
-         main=paste("chromatogram of", as.character(format(peak.mz1, digits=7)),
-           "and", as.character(format(peak.mz2,digits=7)), "m/z"), xlim=xlimit, ylim=ylimit)
-    lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
-    dev.off()
-  }
+  raw.ECI.light <- rawEIC(xfile, c(peak.mz1*(1-mz.ppm.cut), peak.mz1*(1+mz.ppm.cut)) )
+  raw.ECI.heavy <- rawEIC(xfile, c(peak.mz2*(1-mz.ppm.cut), peak.mz2*(1+mz.ppm.cut)) )
+  xlimit <-c( max(1, best.scan.number-25), min(best.scan.number+25, length(raw.ECI.light[[1]]) ) )
+  ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
+  plot(raw.ECI.light[[1]], raw.ECI.light[[2]], type="l", col="red",xlab="scan #", ylab="intensity",
+       main=paste("Chromatogram of", as.character(format(peak.mz1, digits=7)),
+         "and", as.character(format(peak.mz2,digits=7)), "m/z (C)"), xlim=xlimit, ylim=ylimit)
+  lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
+  dev.off()
 }
+
