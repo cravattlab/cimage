@@ -138,7 +138,7 @@ for ( id in levels(factor(pair.matrix[,"hit.id"])) ) {
   i <- order(peaks.maxo)[length(peaks.maxo)]
   peak.index1 <- as.character(pair.matrix.this.id[i,1])
   peak.index2 <- as.character(pair.matrix.this.id[i,2])
-  charge <- pair.matrix.this.id[i,3]
+  charge <- as.numeric( as.character(pair.matrix.this.id[i,3]) )
 
   rt <- ( xpeaks[peak.index1,"rt"] + xpeaks[peak.index2,"rt"] ) / 2.0
   rt.range <- c( rt-rt.window.per.scan, rt+rt.window.per.scan)
@@ -153,22 +153,32 @@ for ( id in levels(factor(pair.matrix[,"hit.id"])) ) {
   peak.mz2 <- peaks.mz2[i]
   peak.maxo1 <- scan.int[ abs(scan.mz-peak.mz1) < mz.ppm.cut * peak.mz1 ]
   peak.maxo2 <- scan.int[ abs(scan.mz-peak.mz2) < mz.ppm.cut * peak.mz2 ]
+  if ( max(scan.int[ scan.mz>peak.mz1 & scan.mz<peak.mz2 ]) > 100 * max(peak.maxo1, peak.maxo2) ) peaks.n <-0
   # a very simple way to find the monoisotopic peak
-  isotope.mz.delta <- isotope.mass.unit / as.numeric(as.character(charge))
+  isotope.mz.delta <- isotope.mass.unit / charge
   lower.mz <- monoiso.mz <- peak.mz1
   lower.int <- monoiso.int <- peak.maxo1
   lower.int.ratio <- 1.0
+  step <- 0
   repeat {
     lower.mz.exist <- abs(scan.mz - monoiso.mz + isotope.mz.delta)/monoiso.mz < mz.ppm.cut
-    if ( sum( lower.mz.exist ) < 1 | lower.int.ratio < 0.5) {
-      # cannot find lower peak any more or intensity not strong enough, finish searching
-      break
-    } else {
-      monoiso.mz <- lower.mz
-      monoiso.int <- lower.int
+    if ( sum( lower.mz.exist >=1 ) ) {
       lower.mz <- scan.mz[lower.mz.exist][1]
       lower.int <- scan.int[lower.mz.exist][1]
       lower.int.ratio <- lower.int/monoiso.int
+      if ( lower.int.ratio < 0.4 ) {
+      # intensity ratio drop too much
+        break
+      } else {
+        monoiso.mz <- lower.mz
+        monoiso.int <- lower.int
+        if (lower.int.ratio < 1 ) step <- step + 1
+        # empirical guess, go no more than 2 peaks to the left
+        if ( step == 2 ) break
+      }
+    } else {
+      # cannot find lower peak any more
+      break
     }
   } # repeat
   # simililarly find the largest mz peak in the doublet cluster
@@ -215,5 +225,17 @@ for ( id in levels(factor(pair.matrix[,"hit.id"])) ) {
          "and", as.character(format(peak.mz2,digits=7)), "m/z (C)"), xlim=xlimit, ylim=ylimit)
   lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
   dev.off()
+  # save entries in a text table for output
+  outlist <- list( best.scan.number, charge, monoiso.mz*charge, monoiso.mz, as.numeric(id), peaks.n )
+  names(outlist) <- c( "scan", "charge", "mass", "mz", "peaks.id", "peaks.count")
+  if ( id == "1" ) {
+    table <- data.frame( outlist )
+  } else {
+    table <- rbind( table, outlist )
+  }
 }
 
+rownames(table) <- table$peaks.id
+table <- table[ order(table$peaks.count, decreasing=TRUE), ]
+out.filename <- paste(output.path, output.file.base, ".table.txt", sep="")
+write.table( format(table,digits=6), out.filename, quote=FALSE, row.names=FALSE)
