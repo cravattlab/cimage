@@ -1,5 +1,7 @@
 library(xcms)
 
+memory.limit(2560) # 2.5G memory maximum
+
 input.file <- "bash.input.file"
 
 input.file.suffix <- ".mzXML"
@@ -119,6 +121,10 @@ for ( rt in levels(factor(xpeaks[,"rt"])) ) {
     pair.list.this.charge <- NULL
   }
 }
+if( length(pair.list) == 0 ) {
+  print("no doublet peaks identified")
+  quit()
+}
 pair.matrix <- matrix(pair.list, ncol=4, byrow=TRUE)
 colnames(pair.matrix) <- c("idx1", "idx2", "charge", "hit.id")
 pair.matrix <- data.frame( pair.matrix )
@@ -150,6 +156,11 @@ for ( id in levels(factor(pair.matrix[,"hit.id"])) ) {
   rt.range <- c( rt-rt.window.per.scan, rt+rt.window.per.scan)
 
   raw.EIC.data <- rawEIC(xfile, massrange=mass.range, timerange=rt.range)
+                                        #strange case: raw.EIC.data not found
+  if ( length(raw.EIC.data$scan) == 0 ) {
+    raw.EIC.data <- rawEIC(xfile, massrange=mass.range, timerange=rt.range-10)
+    if ( length(raw.EIC.data$scan) == 0 ) next
+  }
   best.scan.number <- raw.EIC.data$scan[ order(raw.EIC.data$intensity)[length(raw.EIC.data$intensity)] ]
                                         # get actual ms1 scan spectrum
   scan.data <- getScan(xfile, best.scan.number, massrange=mass.range)
@@ -159,138 +170,136 @@ for ( id in levels(factor(pair.matrix[,"hit.id"])) ) {
   peak.mz2 <- peaks.mz2[i]
   peak.maxo1 <- scan.int[ abs(scan.mz-peak.mz1) < mz.ppm.cut * peak.mz1 ]
   peak.maxo2 <- scan.int[ abs(scan.mz-peak.mz2) < mz.ppm.cut * peak.mz2 ]
-    if ( length(peak.maxo1) != 1 | length(peak.maxo2) != 1 ) next
-    if ( max(scan.int[ scan.mz>peak.mz1 & scan.mz<peak.mz2 ]) > 100 * max(peak.maxo1, peak.maxo2) )
-      peaks.n <-0
+                                        #overlapping peaks
+  if ( length(peak.maxo1) != 1 | length(peak.maxo2) != 1 ) next
+                                        # peaks buried in noise base line
+  if ( max(scan.int[ scan.mz>peak.mz1 & scan.mz<peak.mz2 ]) > 100 * max(peak.maxo1, peak.maxo2) )
+    peaks.n <-0
                                         # a very simple way to find the monoisotopic peak
-    isotope.mz.delta <- isotope.mass.unit / charge
-    lower.mz <- monoiso.mz <- peak.mz1
-    lower.int <- monoiso.int <- peak.maxo1
-    lower.int.ratio <- 1.0
-    step <- 0
-    repeat {
-      lower.mz.exist <- abs(scan.mz - monoiso.mz + isotope.mz.delta)/monoiso.mz < mz.ppm.cut
-      if ( sum( lower.mz.exist >=1 ) ) {
-        lower.mz <- scan.mz[lower.mz.exist][1]
-        lower.int <- scan.int[lower.mz.exist][1]
-        lower.int.ratio <- lower.int/monoiso.int
-        if ( lower.int.ratio < 0.4 ) {
+  isotope.mz.delta <- isotope.mass.unit / charge
+  lower.mz <- monoiso.mz <- peak.mz1
+  lower.int <- monoiso.int <- peak.maxo1
+  lower.int.ratio <- 1.0
+  step <- 0
+  repeat {
+    lower.mz.exist <- abs(scan.mz - monoiso.mz + isotope.mz.delta)/monoiso.mz < mz.ppm.cut
+    if ( sum( lower.mz.exist >=1 ) ) {
+      lower.mz <- scan.mz[lower.mz.exist][1]
+      lower.int <- scan.int[lower.mz.exist][1]
+      lower.int.ratio <- lower.int/monoiso.int
+      if ( lower.int.ratio < 0.4 ) {
                                         # intensity ratio drop too much
-          break
-        } else {
-          monoiso.mz <- lower.mz
-          monoiso.int <- lower.int
-          if (lower.int.ratio < 1 ) step <- step + 1
+        break
+      } else {
+        monoiso.mz <- lower.mz
+        monoiso.int <- lower.int
+        if (lower.int.ratio < 1 ) step <- step + 1
                                         # empirical guess, go no more than 2 peaks to the left
-          if ( step == 2 ) break
-        }
-      } else {
+        if ( step == 2 ) break
+      }
+    } else {
                                         # cannot find lower peak any more
-        break
-      }
-    } # repeat
+      break
+    }
+  } # repeat
                                         # simililarly find the largest mz peak in the doublet cluster
-    cluster.max.mz <- peak.mz2
-    repeat {
-      higher.mz.exist <- abs(scan.mz - cluster.max.mz - isotope.mz.delta)/cluster.max.mz < mz.ppm.cut
-      if ( sum( higher.mz.exist ) < 1 ) {
+  cluster.max.mz <- peak.mz2
+  repeat {
+    higher.mz.exist <- abs(scan.mz - cluster.max.mz - isotope.mz.delta)/cluster.max.mz < mz.ppm.cut
+    if ( sum( higher.mz.exist ) < 1 ) {
                                         # cannot find lower peak any more, finish searching
-        break
-      } else {
-        cluster.max.mz <- scan.mz[higher.mz.exist][1]
-      }
-    } # repeat
+      break
+    } else {
+      cluster.max.mz <- scan.mz[higher.mz.exist][1]
+    }
+  } # repeat
 
-    out.filename <- paste(output.path, output.file.base, "_", peaks.n, "_", id, output.file.suffix, sep="")
+  out.filename <- paste(output.path, output.file.base, "_", peaks.n, "_", id, output.file.suffix, sep="")
                                         # make plot for each isotopic cluster
     png(out.filename)
-    par(mfrow=c(2,1))
-    par(las=0)
+  par(mfrow=c(2,1))
+  par(las=0)
                                         # mz spectrum top
                                         #plotScan(xfile, best.scan.number, massrange=mass.range)
-    ylimit <- c( 0, max(scan.int[(scan.mz>=monoiso.mz&scan.mz<=cluster.max.mz)]) )
-    plot( scan.data[,1], scan.data[,2], type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit)
-    title( paste("Scan # ", best.scan.number, " @ ", round(xfile@scantime[best.scan.number], 1),
-                 " sec (raw # ", (best.scan.number-1)*(num.ms2.per.ms1+1)+1, " @ ",
-                 round(xfile@scantime[best.scan.number]/60,1)," min)", sep = "")
-          )
-    title( paste("Charge:",charge, "; Monoisotopic mz:", round(monoiso.mz,3),"(M)" ), line=0.5)
+  ylimit <- c( 0, max(scan.int[(scan.mz>=monoiso.mz&scan.mz<=cluster.max.mz)]) )
+  plot( scan.data[,1], scan.data[,2], type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit)
+  title( paste("Scan # ", best.scan.number, " @ ", round(xfile@scantime[best.scan.number], 1),
+               " sec (raw # ", (best.scan.number-1)*(num.ms2.per.ms1+1)+1, " @ ",
+               round(xfile@scantime[best.scan.number]/60,1)," min)", sep = "")
+        )
+  title( paste("Charge:",charge, "; Monoisotopic mz:", round(monoiso.mz,3),"(M)" ), line=0.5)
                                         #ymark <- min( scan.data[,2] ) + 10
-    ymark <- 0
+  ymark <- 0
                                         #label all identified peaks under this isotopic envelope
-    points( peaks.mz1, rep(ymark, length(peaks.mz1) ), pch=23, col="red",bg="red")
-    points( peaks.mz2, rep(ymark, length(peaks.mz2) ), pch=23, col="blue",bg="blue")
-    points( peak.mz1, peak.maxo1, pch="C", col="red",bg="red")
-    points( peak.mz2, peak.maxo2, pch="C", col="blue",bg="blue")
-    points( monoiso.mz, monoiso.int, pch="M", col="red",bg="red")
+  points( peaks.mz1, rep(ymark, length(peaks.mz1) ), pch=23, col="red",bg="red")
+  points( peaks.mz2, rep(ymark, length(peaks.mz2) ), pch=23, col="blue",bg="blue")
+  points( peak.mz1, peak.maxo1, pch="C", col="red",bg="red")
+  points( peak.mz2, peak.maxo2, pch="C", col="blue",bg="blue")
+  points( monoiso.mz, monoiso.int, pch="M", col="red",bg="red")
                                         #chromatogram bottom
-    raw.ECI.light <- rawEIC(xfile, c(peak.mz1*(1-mz.ppm.cut), peak.mz1*(1+mz.ppm.cut)) )
-    raw.ECI.heavy <- rawEIC(xfile, c(peak.mz2*(1-mz.ppm.cut), peak.mz2*(1+mz.ppm.cut)) )
-    xlimit <-c( max(1, best.scan.number-25), min(best.scan.number+25, length(raw.ECI.light[[1]]) ) )
-    ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
-    plot(raw.ECI.light[[1]], raw.ECI.light[[2]], type="l", col="red",xlab="scan #", ylab="intensity",
-         main=paste("Chromatogram of", as.character(format(peak.mz1, digits=7)),
-           "and", as.character(format(peak.mz2,digits=7)), "m/z (C)"), xlim=xlimit, ylim=ylimit)
-    lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
-    dev.off()
+  raw.ECI.light <- rawEIC(xfile, c(peak.mz1*(1-mz.ppm.cut), peak.mz1*(1+mz.ppm.cut)) )
+  raw.ECI.heavy <- rawEIC(xfile, c(peak.mz2*(1-mz.ppm.cut), peak.mz2*(1+mz.ppm.cut)) )
+  xlimit <-c( max(1, best.scan.number-25), min(best.scan.number+25, length(raw.ECI.light[[1]]) ) )
+  ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
+  plot(raw.ECI.light[[1]], raw.ECI.light[[2]], type="l", col="red",xlab="scan #", ylab="intensity",
+       main=paste("Chromatogram of", as.character(format(peak.mz1, digits=7)),
+         "and", as.character(format(peak.mz2,digits=7)), "m/z (C)"), xlim=xlimit, ylim=ylimit)
+  lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
+  dev.off()
                                         # save entries in a text table for output
-    outlist <- list( best.scan.number, charge, monoiso.mz*charge, monoiso.mz, as.numeric(id), peaks.n )
-    names(outlist) <- c( "scan", "charge", "mass", "mz", "peaks.id", "peaks.count")
-    if ( length(out.table) == 0 ) {
-      out.table <- data.frame( outlist )
-    } else {
-      out.table <- rbind( out.table, outlist )
-    }
+  outlist <- list( best.scan.number, charge, monoiso.mz*charge, monoiso.mz, as.numeric(id), peaks.n )
+  names(outlist) <- c( "scan", "charge", "mass", "mz", "peaks.id", "peaks.count")
+  if ( length(out.table) == 0 ) {
+    out.table <- data.frame( outlist )
+  } else {
+    out.table <- rbind( out.table, outlist )
   }
+}
 
-  rownames(out.table) <- out.table$peaks.id
-  out.table <- out.table[ order(out.table$peaks.count, decreasing=TRUE), ]
-  out.filename <- paste(output.path, output.file.base, ".table.txt", sep="")
-  write.table( format(out.table,digits=6), out.filename, quote=FALSE, row.names=FALSE)
+rownames(out.table) <- out.table$peaks.id
+out.table <- out.table[ order(out.table$peaks.count, decreasing=TRUE), ]
+out.filename <- paste(output.path, output.file.base, ".table.txt", sep="")
+write.table( format(out.table,digits=6), out.filename, quote=FALSE, row.names=FALSE)
 
                                         # make a pep3d-style xc/ms intensity plot
-  out.filename2 <- paste(output.path, output.file.base, "_MS_SCAN", output.file.suffix, sep="")
-  png(out.filename2,width=8.5,height=11,units="in",res=72)
-  par(mfrow=c(2,1))
-  par(las=1)
+out.filename2 <- paste(output.path, output.file.base, "_MS_SCAN", output.file.suffix, sep="")
+png(out.filename2,width=8.5,height=11,units="in",res=72)
+par(mfrow=c(2,1))
+par(las=1)
 
-  prof.range <- profRange(xfile)
-  masslim <- round( prof.range$massrange )
-  scanlim <- prof.range$scanrange
-  massname <- masslim[1] : masslim[2]
-  scanname <- scanlim[1] : scanlim[2]
-  prof.matrix <- matrix( 0.0,nrow=length(massname), ncol=length(scanname), dimnames=list(massname,scanname) )
+prof.range <- profRange(xfile)
+masslim <- round( prof.range$massrange )
+scanlim <- prof.range$scanrange
+massname <- masslim[1] : masslim[2]
+scanname <- scanlim[1] : scanlim[2]
+prof.matrix <- matrix( 0.0,nrow=length(massname), ncol=length(scanname), dimnames=list(massname,scanname) )
 
-  for (i in 1:length(xfile@scanindex)) {
-    idx <- (xfile@scanindex[i]+1):min(xfile@scanindex[i+1],length(xfile@env$mz), na.rm=TRUE)
-    prof.matrix[as.character(round(xfile@env$mz[idx])), as.character(i)] <- xfile@env$intensity[idx]
-  }
-  image(massname, xfile@scantime[scanname], log(prof.matrix+1), col=gray(256:0/256),
-        xlab="m/z", ylab="Seconds", zlim=log(range(xfile@env$intensity)) )
-  title("XC/MS Log Intensity Image (whole)")
-  col.max <- max( out.table[,"peaks.count"] )
-  for (i in 1:dim(out.table)[1] ) {
-    xp <- round( out.table[i,"mz"] )
-    yp <- out.table[i,"scan"]
-    countp <- out.table[i,"peaks.count"]
-    points( xp, xfile@scantime[yp], type="o", col = rainbow(col.max)[countp] )
-  }
+for (i in 1:length(xfile@scanindex)) {
+  idx <- (xfile@scanindex[i]+1):min(xfile@scanindex[i+1],length(xfile@env$mz), na.rm=TRUE)
+  prof.matrix[as.character(round(xfile@env$mz[idx])), as.character(i)] <- xfile@env$intensity[idx]
+}
+image(massname, xfile@scantime[scanname], log(prof.matrix+1), col=gray(256:0/256),
+      xlab="m/z", ylab="Seconds", zlim=log(range(xfile@env$intensity)) )
+title("XC/MS Log Intensity Image (whole)")
+col.max <- max( out.table[,"peaks.count"] )
+for (i in 1:dim(out.table)[1] ) {
+  xp <- round( out.table[i,"mz"] )
+  yp <- out.table[i,"scan"]
+  countp <- out.table[i,"peaks.count"]
+  points( xp, xfile@scantime[yp], type="o", col = rainbow(col.max)[countp] )
+}
 
-  x.lim <- round (range(out.table[,"mz"]) )
-  y.lim <- range(xfile@scantime[out.table[,"scan"]])
-  image(massname, xfile@scantime[scanname], log(prof.matrix+1), col=gray(256:0/256),
-        xlab="m/z", ylab="Seconds", zlim=log(range(xfile@env$intensity)), xlim=x.lim, ylim=y.lim )
-  title("XC/MS Log Intensity Image (zoom)")
-  col.max <- max( out.table[,"peaks.count"] )
-  for (i in 1:dim(out.table)[1] ) {
-    xp <- round( out.table[i,"mz"] )
-    yp <- out.table[i,"scan"]
-    countp <- out.table[i,"peaks.count"]
-    points( xp, xfile@scantime[yp], type="o", col = rainbow(col.max)[countp] )
-  }
-  dev.off()
-  # free up memory
-  remove(xpeaks)
-  remove(xfile)
-  remove(prof.matrix)
-} # input.files
+x.lim <- round (range(out.table[,"mz"]) )
+y.lim <- range(xfile@scantime[out.table[,"scan"]])
+image(massname, xfile@scantime[scanname], log(prof.matrix+1), col=gray(256:0/256),
+      xlab="m/z", ylab="Seconds", zlim=log(range(xfile@env$intensity)), xlim=x.lim, ylim=y.lim )
+title("XC/MS Log Intensity Image (zoom)")
+col.max <- max( out.table[,"peaks.count"] )
+for (i in 1:dim(out.table)[1] ) {
+  xp <- round( out.table[i,"mz"] )
+  yp <- out.table[i,"scan"]
+  countp <- out.table[i,"peaks.count"]
+  points( xp, xfile@scantime[yp], type="o", col = rainbow(col.max)[countp] )
+}
+dev.off()
+
