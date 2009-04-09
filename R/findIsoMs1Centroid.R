@@ -14,9 +14,11 @@ mz.ppm.cut <- 0.000025 # 25ppm
 # From Eranthie's isotopically labeled probe
 pair.mass.delta <- 6.01381
 # nature mass difference between C12 and C13
-isotope.mass.unit <- 1.00286864
+isotope.mass.unit <- 1.0033548
+# mass of a proton
+Hplus.mass <- 1.0072765
 # possible charge states
-charge.states <- seq(2,4)
+charge.states <- seq(1,6)
 # peak intensity ratio
 intensity.tag <- "maxo"
 # ratio of intensity of heavy and light peaks
@@ -30,12 +32,12 @@ input.path <- getwd()
 input.file.base <- strsplit( input.file, input.file.suffix )[[1]][1]
 output.file.base <- paste(input.file.base,"doublet",sep="_")
 output.path <- paste(input.path,"/", input.file.base, "_doublet_peaks/",sep="")
-system( paste("mkdir -p", output.path) )
+dir.create(output.path)
 
 filename <- paste(input.path, "/", input.file.base, input.file.suffix, sep="")
 xfile <- xcmsRaw( filename, profstep=0 )
 
-xpeaks <- findPeaks(xfile,method="centWave", ppm=25, snthresh=2.0,minptsperpeak=5)
+xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=2.0, minptsperpeak=2)
 num.peaks <- dim(xpeaks)[1]
 rownames(xpeaks) <- seq(1, num.peaks)
                                         # sort the matrix by retention time first
@@ -45,9 +47,9 @@ n.nonredundant.hit <- 0
 pair.list <- NULL
 
 for ( rt in levels(factor(xpeaks[,"rt"])) ) {
-                                        #  rt.range <- c( as.numeric(rt)-rt.cut, as.numeric(rt)+rt.cut)
-                                        #  this.rt <- (xpeaks[,"rt"] > rt.range[1]) & (xpeaks[,"rt"] < rt.range[2] )
-  this.rt <- factor(xpeaks[,"rt"])==rt
+  rt.range <- c( as.numeric(rt)-rt.cut, as.numeric(rt)+rt.cut)
+  this.rt <- (xpeaks[,"rt"] > rt.range[1]) & (xpeaks[,"rt"] < rt.range[2] )
+  #this.rt <- factor(xpeaks[,"rt"])==rt
   if ( sum(this.rt) <= 1 ) next
                                         # get all peaks with this retension time and sort by mz
   xpeaks.this.rt <- xpeaks[this.rt,]
@@ -86,7 +88,7 @@ for ( rt in levels(factor(xpeaks[,"rt"])) ) {
                                         # intensity
           peak.maxo1 <- xpeaks[peak.index1, intensity.tag]
           peak.maxo2 <- xpeaks[peak.index2, intensity.tag]
-                                        #check peak intensity ratio to fall in certain range
+                                        # check peak intensity ratio to fall in certain range
           ratio <- peak.maxo1 / peak.maxo2
           if ( ratio < intensity.ratio.range[1] | ratio > intensity.ratio.range[2] ) next
           new.pair <- c( peak.index1, peak.index2, charge, "0" ) # last number is tracking nonredudant hit
@@ -135,20 +137,28 @@ num.ms2.per.ms1 <- 18
 out.table <- data.frame()
 for ( id in levels(factor(pair.matrix[,"hit.id"])) ) {
   pair.matrix.this.id <- pair.matrix[ pair.matrix[,"hit.id"]==id, ]
+                                        # for peak intensity
+  peaks.maxo1 <- xpeaks[ as.character( pair.matrix.this.id[,"idx1"] ), "maxo"]
+  peaks.maxo2 <- xpeaks[ as.character( pair.matrix.this.id[,"idx2"] ), "maxo"]
+  peaks.maxo <- peaks.maxo1 + peaks.maxo2
+  peaks.maxo.cut <- peaks.maxo > max(peaks.maxo) * 0.01
+  # within same isotopic cluster, get rid background noise by 1% cut
+  peaks.maxo <- peaks.maxo[peaks.maxo.cut]
+  pair.matrix.this.id <- pair.matrix.this.id[peaks.maxo.cut,]
   peaks.mz1 <- xpeaks[ as.character( pair.matrix.this.id[,"idx1"] ), "mz"]
   peaks.mz2 <- xpeaks[ as.character( pair.matrix.this.id[,"idx2"] ), "mz"]
                                         # for plot a specific ms1 scan
   mass.range <- c( min(peaks.mz1) - mass.window, max(peaks.mz2) + mass.window )
                                         # for peak intensity
-  peaks.maxo1 <- xpeaks[ as.character( pair.matrix.this.id[,"idx1"] ), "maxo"]
-  peaks.maxo2 <- xpeaks[ as.character( pair.matrix.this.id[,"idx2"] ), "maxo"]
-  peaks.maxo <- peaks.maxo1 + peaks.maxo2
+  #peaks.maxo1 <- xpeaks[ as.character( pair.matrix.this.id[,"idx1"] ), "maxo"]
+  #peaks.maxo2 <- xpeaks[ as.character( pair.matrix.this.id[,"idx2"] ), "maxo"]
+  #peaks.maxo <- peaks.maxo1 + peaks.maxo2
                                         # num of peaks
   peaks.n <- length( peaks.maxo )
                                         # plot chromatogram of the most intense peak,
-                                        #label others under the same envelope
+                                        # label others under the same envelope
   i <- order(peaks.maxo)[length(peaks.maxo)]
-    peak.index1 <- as.character(pair.matrix.this.id[i,1])
+  peak.index1 <- as.character(pair.matrix.this.id[i,1])
   peak.index2 <- as.character(pair.matrix.this.id[i,2])
   charge <- as.numeric( as.character(pair.matrix.this.id[i,3]) )
 
@@ -247,7 +257,7 @@ for ( id in levels(factor(pair.matrix[,"hit.id"])) ) {
   lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
   dev.off()
                                         # save entries in a text table for output
-  outlist <- list( best.scan.number, charge, monoiso.mz*charge, monoiso.mz, as.numeric(id), peaks.n )
+  outlist <- list( best.scan.number, charge, monoiso.mz*charge-Hplus.mass*charge, monoiso.mz, as.numeric(id), peaks.n )
   names(outlist) <- c( "scan", "charge", "mass", "mz", "peaks.id", "peaks.count")
   if ( length(out.table) == 0 ) {
     out.table <- data.frame( outlist )
@@ -259,7 +269,7 @@ for ( id in levels(factor(pair.matrix[,"hit.id"])) ) {
 rownames(out.table) <- out.table$peaks.id
 out.table <- out.table[ order(out.table$peaks.count, decreasing=TRUE), ]
 out.filename <- paste(output.path, output.file.base, ".table.txt", sep="")
-write.table( format(out.table,digits=6), out.filename, quote=FALSE, row.names=FALSE)
+write.table( format(out.table,digits=10), out.filename, quote=FALSE, row.names=FALSE)
 
                                         # make a pep3d-style xc/ms intensity plot
 out.filename2 <- paste(output.path, output.file.base, "_MS_SCAN", output.file.suffix, sep="")
