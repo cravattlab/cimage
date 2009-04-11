@@ -162,8 +162,10 @@ for ( rt.i in 1:length(rt.list) ) {
     pair.list.tmp <- pair.list.this.charge[F,]
     for( k in 1:n.hit.this.charge ) {
       pair.list.tmp <- pair.list.this.charge[pair.list.this.charge[,"hit.id"] == k, ]
-      valid <- sum( pair.list.tmp[,"rt1"]==rt | pair.list.tmp[,"rt2"]==rt)
-      if ( valid ) {
+      rt.factor <- factor( c(pair.list.this.charge$rt1,pair.list.this.charge$rt2) )
+      rt.levels <- levels(rt.factor)
+      main.rt <- rt.levels[ order(table(rt.factor))[length(rt.levels)] ]
+      if ( main.rt == rt ) {
         n.nonredundant.hit <- n.nonredundant.hit + 1
         pair.list.tmp[,"hit.id"] <- n.nonredundant.hit
         pair.list<- rbind( pair.list, pair.list.tmp )
@@ -243,16 +245,14 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   scan.int <- scan.data[,"intensity"]
   scan.int.zoom <- scan.int[ scan.mz >= min(peaks.mz1) & scan.mz <= max(peaks.mz2) ]
   # noisy peaks, skip
-  if ( max(peaks.maxo1,peaks.maxo2) != max(scan.int.zoom) ) next
+  if ( max(peaks.maxo1,peaks.maxo2) < 0.9*max(scan.int.zoom) ) next
+  # the most intensive peak
   peak.mz1 <- peaks.mz1[i]
   peak.mz2 <- peaks.mz2[i]
   peak.maxo1 <- scan.int[ abs(scan.mz-peak.mz1) < mz.ppm.cut * peak.mz1 ]
   peak.maxo2 <- scan.int[ abs(scan.mz-peak.mz2) < mz.ppm.cut * peak.mz2 ]
                                         #overlapping peaks
   if ( length(peak.maxo1) != 1 | length(peak.maxo2) != 1 ) next
-                                        # peaks buried in noise base line
-  if ( max(scan.int[ scan.mz>peak.mz1 & scan.mz<peak.mz2 ]) > 100 * max(peak.maxo1, peak.maxo2) )
-    peaks.n <-0
                                         # a very simple way to find the monoisotopic peak
   lower.mz <- monoiso.mz <- peak.mz1
   lower.int <- monoiso.int <- peak.maxo1
