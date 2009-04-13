@@ -45,6 +45,11 @@ xpeaks <- xpeaks[order(xpeaks[,"rt"]), ]
                                         # label rownames
 num.peaks <- dim(xpeaks)[1]
 rownames(xpeaks) <- seq(1, num.peaks)
+
+# table with raw pair peak index, charge, rt and hit.id etc
+out.filename0 <- paste(output.path, output.file.base, ".xcms_peaks.txt", sep="")
+write.table( format(xpeaks,digits=10), out.filename0, quote=FALSE, row.names=FALSE)
+
                                         # make a fresh empty list
 n.nonredundant.hit <- 0
 pair.list <- data.frame(idx1=numeric(0),idx2=numeric(0),charge=numeric(0),
@@ -162,9 +167,9 @@ for ( rt.i in 1:length(rt.list) ) {
     pair.list.tmp <- pair.list.this.charge[F,]
     for( k in 1:n.hit.this.charge ) {
       pair.list.tmp <- pair.list.this.charge[pair.list.this.charge[,"hit.id"] == k, ]
-      rt.factor <- factor( c(pair.list.this.charge$rt1,pair.list.this.charge$rt2) )
+      rt.factor <- factor( c(pair.list.tmp$rt1,pair.list.tmp$rt2) )
       rt.levels <- levels(rt.factor)
-      main.rt <- rt.levels[ order(table(rt.factor))[length(rt.levels)] ]
+      main.rt <- rt.levels[ order(table(rt.factor),rev(rt.levels))[length(rt.levels)] ]
       if ( main.rt == rt ) {
         n.nonredundant.hit <- n.nonredundant.hit + 1
         pair.list.tmp[,"hit.id"] <- n.nonredundant.hit
@@ -243,8 +248,11 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   scan.data <- getScan(xfile, best.scan.number, massrange=mass.range)
   scan.mz <- scan.data[,"mz"]
   scan.int <- scan.data[,"intensity"]
-  scan.int.zoom <- scan.int[ scan.mz >= min(peaks.mz1) & scan.mz <= max(peaks.mz2) ]
-  # noisy peaks, skip
+  tmp <- (scan.mz >= min(peaks.mz1) & scan.mz <= max(peaks.mz2) )
+  #scan.mz.zoom <- scan.mz[ tmp ]
+  scan.int.zoom <- scan.int[ tmp ]
+  # the most intensive peak should match one of the pairs
+  #tmp.mz <- scan.mz.zoom[ order(scan.int.zoom)[length(scan.int.zoom)] ]
   if ( max(peaks.maxo1,peaks.maxo2) < 0.9*max(scan.int.zoom) ) next
   # the most intensive peak
   peak.mz1 <- peaks.mz1[i]
