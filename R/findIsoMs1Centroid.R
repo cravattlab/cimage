@@ -210,8 +210,8 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   pair.list.this.id <- pair.list.this.id[peaks.maxo.cut,]
   peaks.mz1 <- as.numeric(pair.list.this.id[,"mz1"])
   peaks.mz2 <- as.numeric(pair.list.this.id[,"mz2"])
-  # most intense peak position
-  i <- order(peaks.maxo)[length(peaks.maxo)]
+  # most intense peak position in the light envelope
+  i <- order(peaks.maxo1)[length(peaks.maxo1)]
   envelope1 <- abs( (peaks.mz1-peaks.mz1[i])/isotope.mz.delta )
   envelope2 <- abs( (peaks.mz2-peaks.mz2[i])/isotope.mz.delta )
   envelope.check <- (abs(envelope1-round(envelope1))/peaks.mz1[i] < mz.ppm.cut &
