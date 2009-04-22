@@ -15,6 +15,7 @@ mz.ppm.cut <- 0.000025 # 25ppm
 pair.mass.delta <- 6.01381
 # nature mass difference between C12 and C13
 isotope.mass.unit <- 1.0033548
+mass.shift <- round( pair.mass.delta/isotope.mass.unit )
 # mass of a proton
 Hplus.mass <- 1.0072765
 # possible charge states
@@ -198,20 +199,20 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   pair.list.this.id <- pair.list[ pair.list[,"hit.id"]==id, ]
   charge <- as.numeric(pair.list.this.id[1,"charge"])
   isotope.mz.delta <- isotope.mass.unit / charge
-  # peak intensity
+  ## peak intensity
   peaks.maxo1 <- xpeaks[ as.character( pair.list.this.id[,"idx1"] ), "maxo"]
   peaks.maxo2 <- xpeaks[ as.character( pair.list.this.id[,"idx2"] ), "maxo"]
   peaks.maxo <- peaks.maxo1 + peaks.maxo2
   peaks.maxo.cut <- peaks.maxo > max(peaks.maxo) * 0.1
-  # within same isotopic cluster, get rid background noise by 1% cut
+  ## within same isotopic cluster, get rid background noise by 1% cut
   peaks.maxo <- peaks.maxo[peaks.maxo.cut]
   peaks.maxo1 <- peaks.maxo1[peaks.maxo.cut]
   peaks.maxo2 <- peaks.maxo2[peaks.maxo.cut]
   pair.list.this.id <- pair.list.this.id[peaks.maxo.cut,]
   peaks.mz1 <- as.numeric(pair.list.this.id[,"mz1"])
   peaks.mz2 <- as.numeric(pair.list.this.id[,"mz2"])
-  # most intense peak position in the light envelope
-  i <- order(peaks.maxo1)[length(peaks.maxo1)]
+  ## most intense peak position in the light envelope
+  i <- which.max(peaks.maxo1)
   envelope1 <- abs( (peaks.mz1-peaks.mz1[i])/isotope.mz.delta )
   envelope2 <- abs( (peaks.mz2-peaks.mz2[i])/isotope.mz.delta )
   envelope.check <- (abs(envelope1-round(envelope1))/peaks.mz1[i] < mz.ppm.cut &
@@ -225,103 +226,120 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   peaks.maxo1 <- peaks.maxo1[envelope.check]
   peaks.maxo2 <- peaks.maxo2[envelope.check]
 
-  # for plot a specific ms1 scan
-  mass.range <- c( min(peaks.mz1) - mass.window, max(peaks.mz2) + mass.window )
-  # num of peaks
-  peaks.n <- length( peaks.maxo )
-  # need at least three peak pairs per hit
-  if (peaks.n < 3) next
-  # plot chromatogram of the most intense peak,
-  # label others under the same envelope
-  i <- order(peaks.maxo)[length(peaks.maxo)]
-  rt <- ( as.numeric(pair.list.this.id[i,"rt1"]) + as.numeric(pair.list.this.id[i,"rt2"]) ) / 2.0
-  rt.range <- c( rt-rt.window.per.scan, rt+rt.window.per.scan)
-
-  raw.EIC.data <- rawEIC(xfile, massrange=mass.range, timerange=rt.range)
-                                        #strange case: raw.EIC.data not found
-  if ( length(raw.EIC.data$scan) == 0 ) {
-    raw.EIC.data <- rawEIC(xfile, massrange=mass.range, timerange=rt.range-10)
-    if ( length(raw.EIC.data$scan) == 0 ) next
+  redundancy.check <- which( diff(peaks.mz1)/peaks.mz1[-1] < mz.ppm.cut ) + 1
+  if ( length(redundancy.check)>0 ) {
+    pair.list.this.id <- pair.list.this.id[-redundancy.check,]
+    peaks.mz1 <- as.numeric(pair.list.this.id[,"mz1"])
+    peaks.mz2 <- as.numeric(pair.list.this.id[,"mz2"])
+    peaks.maxo <- peaks.maxo[-redundancy.check]
+    peaks.maxo1 <- peaks.maxo1[-redundancy.check]
+    peaks.maxo2 <- peaks.maxo2[-redundancy.check]
   }
-  best.scan.number <- raw.EIC.data$scan[ order(raw.EIC.data$intensity)[length(raw.EIC.data$intensity)] ]
-                                        # get actual ms1 scan spectrum
+
+  ## num of peaks
+  peaks.n <- length( peaks.maxo )
+  ## need at least three peak pairs per hit
+  if (peaks.n < 3) next
+
+  ## calculate isotope distribution based on averagine assumption
+  predicted.mass <- charge*peaks.mz1[1]
+  predicted.comp <- averagine.count( predicted.mass)
+  predicted.dist <- isotope.dist(predicted.comp)
+  predicted.dist.merge <- c(predicted.dist,rep(0,mass.shift)) + c(rep(0,mass.shift),predicted.dist)
+  predicted.dist.merge <- predicted.dist.merge/max(predicted.dist.merge)
+  observed.mz <- c(peaks.mz1, peaks.mz2)
+  observed.maxo <- c(peaks.maxo1,peaks.maxo2)
+  observed.maxo <- observed.maxo/max(observed.maxo)
+  observed.index <- round((observed.mz - peaks.mz1[1])/isotope.mz.delta)
+  pcor <- rep(0,mass.shift)
+  for (s in 1:mass.shift) {
+    predicted.maxo <- predicted.dist.merge[observed.index+s]
+    pcor[s] <-  lsfit(predicted.maxo,observed.maxo)[[1]][2]#cov(predicted.maxo,observed.maxo)/(sd(predicted.maxo)*sd(observed.maxo))
+  }
+  ##best.shift <- which.max(pcor) - 1
+  ##best.pcor <- max(pcor)
+  best.shift <- which.min(abs(pcor-1.0))
+  best.pcor <- pcor[best.shift]
+  best.shift <- best.shift-1
+  predicted.mono.mz <- peaks.mz1[1] - best.shift*isotope.mz.delta
+  upper.bound <- max( which(predicted.dist.merge> 0.01) )
+  upper.bound.mz <- predicted.mono.mz + (upper.bound-1)*isotope.mz.delta
+  predicted.mz <- predicted.mono.mz + seq(0,upper.bound-1)*isotope.mz.delta
+  predicted.int <- predicted.dist.merge[1:upper.bound]
+  ## plot chromatogram of the most intense peak,
+  ## label others under the same envelope
+  ## most intense peak position in the light envelope
+  i <- which.max(peaks.maxo1)
+  rt <- as.numeric( pair.list.this.id[i,"rt1"] )
+  ##rt <- ( as.numeric(pair.list.this.id[i,"rt1"]) + as.numeric(pair.list.this.id[i,"rt2"]) ) / 2.0
+  rt.range <- c( rt-rt.window.per.scan, rt+rt.window.per.scan)
+  ## get corresponding scan number
+  best.scan.number <- which(xfile@scantime == rt)
+  ## for plot a specific ms1 scan
+  mass.range <- c( min(peaks.mz1) - mass.window, max(peaks.mz2) + mass.window )
+  ## get actual ms1 scan spectrum
   scan.data <- getScan(xfile, best.scan.number, massrange=mass.range)
   scan.mz <- scan.data[,"mz"]
   scan.int <- scan.data[,"intensity"]
   tmp <- (scan.mz >= min(peaks.mz1) & scan.mz <= max(peaks.mz2) )
-  #scan.mz.zoom <- scan.mz[ tmp ]
+  ##scan.mz.zoom <- scan.mz[ tmp ]
   scan.int.zoom <- scan.int[ tmp ]
-  # the most intensive peak should match one of the pairs
-  #tmp.mz <- scan.mz.zoom[ order(scan.int.zoom)[length(scan.int.zoom)] ]
+  ## the most intensive peak should match one of the pairs
+  ## tmp.mz <- scan.mz.zoom[ order(scan.int.zoom)[length(scan.int.zoom)] ]
   if ( max(peaks.maxo1,peaks.maxo2) < 0.9*max(scan.int.zoom) ) next
-  # the most intensive peak
+  ## the most intensive peak
   peak.mz1 <- peaks.mz1[i]
   peak.mz2 <- peaks.mz2[i]
   peak.maxo1 <- scan.int[ abs(scan.mz-peak.mz1) < mz.ppm.cut * peak.mz1 ]
   peak.maxo2 <- scan.int[ abs(scan.mz-peak.mz2) < mz.ppm.cut * peak.mz2 ]
-                                        #overlapping peaks
+  ##overlapping peaks
   if ( length(peak.maxo1) != 1 | length(peak.maxo2) != 1 ) next
-                                        # a very simple way to find the monoisotopic peak
-  lower.mz <- monoiso.mz <- peak.mz1
-  lower.int <- monoiso.int <- peak.maxo1
-  lower.int.ratio <- 1.0
-  step <- 0
-  repeat {
-    lower.mz.exist <- abs(scan.mz - monoiso.mz + isotope.mz.delta)/monoiso.mz < mz.ppm.cut
-    if ( sum( lower.mz.exist >=1 ) ) {
-      lower.mz <- scan.mz[lower.mz.exist][1]
-      lower.int <- scan.int[lower.mz.exist][1]
-      lower.int.ratio <- lower.int/monoiso.int
-      if ( lower.int.ratio < 0.2 ) {
-        # intensity ratio drop too much
-        break
-      } else {
-        monoiso.mz <- lower.mz
-        monoiso.int <- lower.int
-        if (lower.int.ratio < 1 ) step <- step + 1
-                                        # empirical guess, go no more than 2 peaks to the left
-        if ( step == 2 ) break
-      }
-    } else {
-                                        # cannot find lower peak any more
-      break
-    }
-  } # repeat
-                                        # simililarly find the largest mz peak in the doublet cluster
-  cluster.max.mz <- peak.mz2
-  repeat {
-    higher.mz.exist <- abs(scan.mz - cluster.max.mz - isotope.mz.delta)/cluster.max.mz < mz.ppm.cut
-    if ( sum( higher.mz.exist ) < 1 ) {
-                                        # cannot find lower peak any more, finish searching
-      break
-    } else {
-      cluster.max.mz <- scan.mz[higher.mz.exist][1]
-    }
-  } # repeat
 
   out.filename <- paste(output.path, output.file.base, "_", peaks.n, "_", id, output.file.suffix, sep="")
-                                        # make plot for each isotopic cluster
+  ## make plot for each isotopic cluster
   png(out.filename)
   par(mfrow=c(2,1))
   par(las=0)
-                                        # mz spectrum top
-                                        #plotScan(xfile, best.scan.number, massrange=mass.range)
-  ylimit <- c( 0, max(scan.int[(scan.mz>=monoiso.mz&scan.mz<=cluster.max.mz)]) )
-  plot( scan.data[,1], scan.data[,2], type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit)
+  ## mz spectrum top
+  ##plotScan(xfile, best.scan.number, massrange=mass.range)
+  scan.int <- scan.int/max(scan.int.zoom)
+  ##least-sqaured fit with single scan ###
+  observed.int <- rep(0,upper.bound)
+  for ( i in 1:upper.bound ) {
+    i.mz <- predicted.mz[i]
+    matched.index <- which(abs(scan.mz-i.mz)/predicted.mono.mz<mz.ppm.cut)
+    if (length(matched.index)>1) {
+      matched.index <- matched.index[ which.min(abs(scan.mz[matched.index]-predicted.mono.mz)) ]
+    }
+    i.int <- scan.int[matched.index]
+    if (length(i.int) == 0) {
+      i.int = 0
+    }
+    observed.int[i] <- i.int
+  }
+  observed.mono.int <- observed.int[1]
+  best.pcor <-  lsfit(predicted.int,observed.int)[[1]][2] #coefficient-slope
+  ## plot ###
+  ylimit <- c( 0, 1.05) #max(scan.int[(scan.mz>=predicted.mono.mz&scan.mz<=upper.bound.mz)]) )
+  plot( scan.mz, scan.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit)
+
   title( paste("Scan # ", best.scan.number, " @ ", round(xfile@scantime[best.scan.number], 1),
                " sec (raw # ", (best.scan.number-1)*(num.ms2.per.ms1+1)+1, " @ ",
                round(xfile@scantime[best.scan.number]/60,1)," min)", sep = "")
         )
-  title( paste("Charge:",charge, "; Monoisotopic mz:", round(monoiso.mz,3),"(M)" ), line=0.5)
-                                        #ymark <- min( scan.data[,2] ) + 10
+  title( paste("Charge:",charge, "; Mono.mz:", round(predicted.mono.mz,3),"(M); NL:",
+               formatC(max(peak.maxo1,peak.maxo2), digits=2,format="e")), line=0.5)
+  ##ymark <- min( scan.data[,2] ) + 10
   ymark <- 0
-                                        #label all identified peaks under this isotopic envelope
+  ##label all identified peaks under this isotopic envelope
   points( peaks.mz1, rep(ymark, length(peaks.mz1) ), pch=23, col="red",bg="red")
   points( peaks.mz2, rep(ymark, length(peaks.mz2) ), pch=24, col="blue",bg="blue")
-  points( peak.mz1, peak.maxo1, pch="C", col="red",bg="red")
-  points( peak.mz2, peak.maxo2, pch="C", col="blue",bg="blue")
-  points( monoiso.mz, monoiso.int, pch="M", col="red",bg="red")
-                                        #chromatogram bottom
+  ##points( peak.mz1, peak.maxo1, pch="C", col="red",bg="red")
+  ##points( peak.mz2, peak.maxo2, pch="C", col="blue",bg="blue")
+  points( predicted.mono.mz, min(observed.mono.int,1.0), pch="M", col="red",bg="red")
+  par(new=T)
+  plot( predicted.mz, predicted.int, type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
+  ##chromatogram bottom
   raw.ECI.light <- rawEIC(xfile, c(peak.mz1*(1-mz.ppm.cut), peak.mz1*(1+mz.ppm.cut)) )
   raw.ECI.heavy <- rawEIC(xfile, c(peak.mz2*(1-mz.ppm.cut), peak.mz2*(1+mz.ppm.cut)) )
   xlimit <-c( max(1, best.scan.number-5), min(best.scan.number+5, length(raw.ECI.light[[1]]) ) )
@@ -331,9 +349,9 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
          "and", as.character(format(peak.mz2,digits=7)), "m/z (C)"), xlim=xlimit, ylim=ylimit)
   lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
   dev.off()
-                                        # save entries in a text table for output
-  outlist <- list( best.scan.number, charge, monoiso.mz*charge-Hplus.mass*charge, monoiso.mz, peak.mz1, as.numeric(id), peaks.n )
-  names(outlist) <- c( "scan", "charge", "mono.mass", "mono.mz", "peak.mz", "peaks.id", "peaks.count")
+  ## save entries in a text table for output
+  outlist <- list( best.scan.number, charge, predicted.mono.mz*charge-Hplus.mass*charge, predicted.mono.mz, peak.mz1, as.numeric(id), peaks.n, best.pcor )
+  names(outlist) <- c( "scan", "charge", "mono.mass", "mono.mz", "peak.mz", "peaks.id", "peaks.count", "pcor")
   if ( length(out.table) == 0 ) {
     out.table <- data.frame( outlist )
   } else {
@@ -341,13 +359,13 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   }
 }
 
-# table with peak.count
+## table with peak.count
 rownames(out.table) <- out.table$peaks.id
 out.table <- out.table[ order(out.table$peaks.count, decreasing=TRUE), ]
 out.filename <- paste(output.path, output.file.base, ".table.txt", sep="")
 write.table( format(out.table,digits=10), out.filename, quote=FALSE, row.names=FALSE)
 
-                                        # make a pep3d-style xc/ms intensity plot
+## make a pep3d-style xc/ms intensity plot
 out.filename2 <- paste(output.path, output.file.base, "_MS_SCAN", output.file.suffix, sep="")
 png(out.filename2,width=8.5,height=11,units="in",res=72)
 par(mfrow=c(2,1))
