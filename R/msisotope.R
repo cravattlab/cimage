@@ -1,6 +1,6 @@
 isotope.dist <- function(elements.count) {
-  elements <- c( "C", "N", "O", "H", "S" )
-  heavy <- c(1.10, 0.37, 0.20, 0.015, 4.21)/100
+  elements <- c( "C", "H", "N", "O", "S" )
+  heavy <- c(1.10, 0.015, 0.37, 0.20, 4.21)/100
   names(heavy) <- elements
   light <- 1.00 - heavy
   names(elements.count) <- elements
@@ -40,8 +40,8 @@ isotope.dist <- function(elements.count) {
 #isotope.dist(c(60,13,13,86,2))
 averagine.count <- function(input.mass) {
   averagine.mass <- 111.1254
-  elements <- c( "C", "N", "O", "H", "S" )
+  elements <- c( "C", "H", "N", "O", "S" )
   averagine.comp <- c( 4.9348, 7.7583, 1.3577, 1.4773, 0.0417 )
-  names(avergine.comp) <- elements
+  names(averagine.comp) <- elements
   return( round(averagine.comp*(input.mass/averagine.mass)) )
 }
