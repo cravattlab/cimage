@@ -1,8 +1,8 @@
-library(xcms)
-
-#memory.limit(2560) # 2.5G memory maximum
-
 input.file <- "bash.input.file"
+
+library(xcms)
+source("~/svnrepos/R/msisotope.R")
+#memory.limit(2560) # 2.5G memory maximum
 
 input.file.suffix <- ".mzXML"
 output.file.suffix <- ".png"
@@ -245,16 +245,20 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   predicted.mass <- charge*peaks.mz1[1]
   predicted.comp <- averagine.count( predicted.mass)
   predicted.dist <- isotope.dist(predicted.comp)
+  predicted.max.index <- which.max(predicted.dist) # control how windows is slided
   predicted.dist.merge <- c(predicted.dist,rep(0,mass.shift)) + c(rep(0,mass.shift),predicted.dist)
   predicted.dist.merge <- predicted.dist.merge/max(predicted.dist.merge)
   observed.mz <- c(peaks.mz1, peaks.mz2)
   observed.maxo <- c(peaks.maxo1,peaks.maxo2)
   observed.maxo <- observed.maxo/max(observed.maxo)
   observed.index <- round((observed.mz - peaks.mz1[1])/isotope.mz.delta)
-  pcor <- rep(0,mass.shift)
-  for (s in 1:mass.shift) {
+  pcor <- rep(0,predicted.max.index)
+  picpt <- rep(0,predicted.max.index)
+  for (s in 1:predicted.max.index) { # when sliding, never omit the most intensive predicted peak
     predicted.maxo <- predicted.dist.merge[observed.index+s]
-    pcor[s] <-  lsfit(predicted.maxo,observed.maxo)[[1]][2]#cov(predicted.maxo,observed.maxo)/(sd(predicted.maxo)*sd(observed.maxo))
+    fit <-  lsfit(predicted.maxo,observed.maxo)
+    pcor[s] <- fit[[1]][2]
+    picpt[s] <- fit[[1]][1]
   }
   ##best.shift <- which.max(pcor) - 1
   ##best.pcor <- max(pcor)
@@ -307,9 +311,9 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   observed.int <- rep(0,upper.bound)
   for ( i in 1:upper.bound ) {
     i.mz <- predicted.mz[i]
-    matched.index <- which(abs(scan.mz-i.mz)/predicted.mono.mz<mz.ppm.cut)
+    matched.index <- which(abs(scan.mz-i.mz)/predicted.mono.mz<2*mz.ppm.cut)
     if (length(matched.index)>1) {
-      matched.index <- matched.index[ which.min(abs(scan.mz[matched.index]-predicted.mono.mz)) ]
+      matched.index <- matched.index[ which.min(abs(scan.mz[matched.index]-i.mz)) ]
     }
     i.int <- scan.int[matched.index]
     if (length(i.int) == 0) {
@@ -318,17 +322,33 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
     observed.int[i] <- i.int
   }
   observed.mono.int <- observed.int[1]
-  best.pcor <-  lsfit(predicted.int,observed.int)[[1]][2] #coefficient-slope
+  fit <- lsfit(predicted.int,observed.int) #coefficient-slope
+  best.pcor <- fit[[1]][2]
+  best.icpt <- fit[[1]][1]
+  max.residual <- max(abs(fit$residuals))
+  avg.residual <- mean(abs(fit$residuals))
   ## plot ###
   ylimit <- c( 0, 1.05) #max(scan.int[(scan.mz>=predicted.mono.mz&scan.mz<=upper.bound.mz)]) )
-  plot( scan.mz, scan.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit)
-
-  title( paste("Scan # ", best.scan.number, " @ ", round(xfile@scantime[best.scan.number], 1),
+  ## raw spectrum in gray ##
+  plot( scan.mz, scan.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit, col="gray")
+  ## matched spectrum in black ##
+  par(new=T)
+  plot( predicted.mz, observed.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit)
+  ## predicted spectrum in green ##
+  par(new=T)
+  plot( predicted.mz, predicted.int, type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
+  title( paste("Charge:",charge, "; Mono.mz:", round(predicted.mono.mz,3),"(M); NL:",
+               formatC(max(peak.maxo1,peak.maxo2), digits=2,format="e") )
+        )
+  title( paste("ax:", formatC(best.pcor,digits=2),
+               "; b:", formatC(best.icpt,digits=2),
+               "; max(r):", formatC(max.residual, digits=2),
+               "; avg(r):", formatC(avg.residual,digits=2) ), line=0.5
+        )
+  title( sub=paste("Scan # ", best.scan.number, " @ ", round(xfile@scantime[best.scan.number], 1),
                " sec (raw # ", (best.scan.number-1)*(num.ms2.per.ms1+1)+1, " @ ",
                round(xfile@scantime[best.scan.number]/60,1)," min)", sep = "")
         )
-  title( paste("Charge:",charge, "; Mono.mz:", round(predicted.mono.mz,3),"(M); NL:",
-               formatC(max(peak.maxo1,peak.maxo2), digits=2,format="e")), line=0.5)
   ##ymark <- min( scan.data[,2] ) + 10
   ymark <- 0
   ##label all identified peaks under this isotopic envelope
@@ -337,12 +357,10 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   ##points( peak.mz1, peak.maxo1, pch="C", col="red",bg="red")
   ##points( peak.mz2, peak.maxo2, pch="C", col="blue",bg="blue")
   points( predicted.mono.mz, min(observed.mono.int,1.0), pch="M", col="red",bg="red")
-  par(new=T)
-  plot( predicted.mz, predicted.int, type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
   ##chromatogram bottom
   raw.ECI.light <- rawEIC(xfile, c(peak.mz1*(1-mz.ppm.cut), peak.mz1*(1+mz.ppm.cut)) )
   raw.ECI.heavy <- rawEIC(xfile, c(peak.mz2*(1-mz.ppm.cut), peak.mz2*(1+mz.ppm.cut)) )
-  xlimit <-c( max(1, best.scan.number-5), min(best.scan.number+5, length(raw.ECI.light[[1]]) ) )
+  xlimit <-c( max(1, best.scan.number-10), min(best.scan.number+10, length(raw.ECI.light[[1]]) ) )
   ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
   plot(raw.ECI.light[[1]], raw.ECI.light[[2]], type="l", col="red",xlab="scan #", ylab="intensity",
        main=paste("Chromatogram of", as.character(format(peak.mz1, digits=7)),
@@ -350,8 +368,8 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
   dev.off()
   ## save entries in a text table for output
-  outlist <- list( best.scan.number, charge, predicted.mono.mz*charge-Hplus.mass*charge, predicted.mono.mz, peak.mz1, as.numeric(id), peaks.n, best.pcor )
-  names(outlist) <- c( "scan", "charge", "mono.mass", "mono.mz", "peak.mz", "peaks.id", "peaks.count", "pcor")
+  outlist <- list( best.scan.number, charge, predicted.mono.mz*charge-Hplus.mass*charge, predicted.mono.mz, peak.mz1, as.numeric(id), peaks.n, best.pcor, best.icpt, max.residual, avg.residual)
+  names(outlist) <- c( "scan", "charge", "mono.mass", "mono.mz", "peak.mz", "peaks.id", "peaks.count", "pcor", "icpt", "max.residual", "avg.residual")
   if ( length(out.table) == 0 ) {
     out.table <- data.frame( outlist )
   } else {
