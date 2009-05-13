@@ -36,7 +36,13 @@ output.path <- paste(input.path,"/", input.file.base, "_doublet_peaks/",sep="")
 dir.create(output.path)
 
 filename <- paste(input.path, "/", input.file.base, input.file.suffix, sep="")
-xfile <- xcmsRaw( filename, profstep=0 )
+xfile <- xcmsRaw( filename, profstep=0, includeMSn=T )
+## a table of scan number versus parent M/Z of ms2 scans
+yfile <- cbind(xfile@msnAcquisitionNum, xfile@msnRt, xfile@msnScanindex, xfile@msnPrecursorMz)
+dimnames(yfile)[[2]] <- c("num","index","rt","pmz")
+dimnames(yfile)[[1]] <- as.character( xfile@msnAcquisitionNum)
+tfile <- read.table( paste(filename,"scanNum_parentMz",sep="."), header=T)
+yfile[,"pmz"] <- tfile[,"parentMz"][match(yfile[,"num"],tfile[,"scanNum"])]
 
 xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=2.0, minptsperpeak=2)
                                         # sort the matrix by retention time first
@@ -250,6 +256,15 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   predicted.dist.merge <- predicted.dist.merge/max(predicted.dist.merge)
   observed.mz <- c(peaks.mz1, peaks.mz2)
   observed.maxo <- c(peaks.maxo1,peaks.maxo2)
+  observed.indx <- c(as.character( pair.list.this.id[,"idx1"]), as.character( pair.list.this.id[,"idx2"]) )
+  ## the most intensive peak under this envelope
+  output.maxo <- max(observed.maxo)
+  tmp.indx <- observed.indx[which.max(observed.maxo)]
+  ## s/n ratio of this peak
+  output.sn <- xpeaks[tmp.indx,"sn"]
+  ## rt range of this peak
+  rt.min <- xpeaks[tmp.indx,"rtmin"]
+  rt.max <- xpeaks[tmp.indx,"rtmax"]
   observed.maxo <- observed.maxo/max(observed.maxo)
   observed.index <- round((observed.mz - peaks.mz1[1])/isotope.mz.delta)
   pcor <- rep(0,predicted.max.index)
@@ -270,6 +285,10 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   upper.bound.mz <- predicted.mono.mz + (upper.bound-1)*isotope.mz.delta
   predicted.mz <- predicted.mono.mz + seq(0,upper.bound-1)*isotope.mz.delta
   predicted.int <- predicted.dist.merge[1:upper.bound]
+  ## figure out if each of the predicted MZ has a ms2 fragmentation triggered
+  predicted.mz.ms2 <- find.ms2.triggered( xfile, yfile, predicted.mz, c(rt.min, rt.max) )
+  output.nms2 <- sum(predicted.mz.ms2)
+
   ## plot chromatogram of the most intense peak,
   ## label others under the same envelope
   ## most intense peak position in the light envelope
@@ -337,6 +356,8 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   ## predicted spectrum in green ##
   par(new=T)
   plot( predicted.mz, predicted.int, type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
+  ms2.yes <- which(predicted.mz.ms2[as.character(best.scan.number),]>0)
+  points( predicted.mz[ms2.yes], observed.int[ms2.yes], type='p', pch=8 )
   title( paste("Charge:",charge, "; Mono.mz:", round(predicted.mono.mz,3),"(M); NL:",
                formatC(max(peak.maxo1,peak.maxo2), digits=2,format="e") )
         )
@@ -366,10 +387,20 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
        main=paste("Chromatogram of", as.character(format(peak.mz1, digits=7)),
          "and", as.character(format(peak.mz2,digits=7)), "m/z (C)"), xlim=xlimit, ylim=ylimit)
   lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
+  peak.mz1.i <- which( abs(predicted.mz-peak.mz1)/peak.mz1 < 2*mz.ppm.cut )
+  ms2.yes <- which( predicted.mz.ms2[,peak.mz1.i] > 0 )
+  ms2.yes.scan.num <- as.integer(dimnames(predicted.mz.ms2)[[1]][ms2.yes])
+  points( ms2.yes.scan.num, raw.ECI.light[[2]][raw.ECI.light[[1]]%in%ms2.yes.scan.num],
+         type='p', pch=8, col="red")
+  peak.mz2.i <- which( abs(predicted.mz-peak.mz2)/peak.mz2 < 2*mz.ppm.cut )
+  ms2.yes <- which( predicted.mz.ms2[,peak.mz2.i] > 0 )
+  ms2.yes.scan.num <- as.integer(dimnames(predicted.mz.ms2)[[1]][ms2.yes])
+  points( ms2.yes.scan.num, raw.ECI.heavy[[2]][raw.ECI.heavy[[1]]%in%ms2.yes.scan.num],
+         type='p', pch=8, col="blue")
   dev.off()
   ## save entries in a text table for output
-  outlist <- list( best.scan.number, charge, predicted.mono.mz*charge-Hplus.mass*charge, predicted.mono.mz, peak.mz1, as.numeric(id), peaks.n, best.pcor, best.icpt, max.residual, avg.residual)
-  names(outlist) <- c( "scan", "charge", "mono.mass", "mono.mz", "peak.mz", "peaks.id", "peaks.count", "pcor", "icpt", "max.residual", "avg.residual")
+  outlist <- list( best.scan.number, charge, predicted.mono.mz*charge-Hplus.mass*charge, predicted.mono.mz, peak.mz1, as.numeric(id), peaks.n, best.pcor, best.icpt, max.residual, output.maxo, output.sn, output.nms2)
+  names(outlist) <- c( "scan", "charge", "mono.mass", "mono.mz", "peak.mz", "peaks.id", "peaks.count", "pcor", "icpt", "max.residual", "max.peakIntensity", "sn", "n.ms2")
   if ( length(out.table) == 0 ) {
     out.table <- data.frame( outlist )
   } else {
