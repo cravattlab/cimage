@@ -34,14 +34,37 @@ isotope.dist <- function(elements.count) {
     }
   }
   return(all.prob)
-#  return(single.prob)
+##  return(single.prob)
 }
 
-#isotope.dist(c(60,13,13,86,2))
+## isotope.dist(c(60,13,13,86,2))
 averagine.count <- function(input.mass) {
   averagine.mass <- 111.1254
   elements <- c( "C", "H", "N", "O", "S" )
   averagine.comp <- c( 4.9348, 7.7583, 1.3577, 1.4773, 0.0417 )
   names(averagine.comp) <- elements
   return( round(averagine.comp*(input.mass/averagine.mass)) )
+}
+
+## ms2 triggered?
+find.ms2.triggered <- function(xfile, yfile, predicted.mz, rt.range) {
+  ms1.scanNums <- which( xfile@scantime>=rt.range[1]&xfile@scantime<=rt.range[2] )
+  ms2.matrix <- matrix(0, nrow=length(ms1.scanNums), ncol=length(predicted.mz) )
+  dimnames(ms2.matrix)[[1]] <- as.character(ms1.scanNums)
+  dimnames(ms2.matrix)[[2]] <- as.character(predicted.mz)
+  ms2.acq.num.max <- max(xfile@msnAcquisitionNum)
+  for (i in 1:dim(ms2.matrix)[1]) {
+    ms1.scanNum <- ms1.scanNums[i]
+    ms2.acq.num.begin <- xfile@acquisitionNum[ms1.scanNum]+1
+    if ( ms1.scanNum < length(xfile@scantime) ) {
+      ms2.acq.num.end <- xfile@acquisitionNum[ms1.scanNum+1]-1
+    } else {
+      ms2.acq.num.end <- ms2.acq.num.max
+    }
+    ms2.mz <- yfile[yfile[,"num"]>=ms2.acq.num.begin&yfile[,"num"]<=ms2.acq.num.end, "pmz"]
+    for (j in 1:dim(ms2.matrix)[2]) {
+      ms2.matrix[i,j] <- sum( abs( ms2.mz-predicted.mz[j] )<0.1)
+    }
+  }
+  return(ms2.matrix)
 }
