@@ -5,12 +5,12 @@ if [ $# -lt 3 ]; then
     exit -1
 fi
 
-infile=$(echo $1 | sed 's/\.txt$//g')
+infile=$1 #(echo $1 | sed 's/\.txt$//g')
 shift
 mzxml=$@
 
-cat $infile.txt | grep -v "Description" | awk 'BEGIN{FS="\t"}{print $3}' > $infile.peptide_tagged
-cat $infile.txt | grep -v "Description" | awk 'BEGIN{FS="\t"}{print $3}' | sed 's/\*//g' | cut -f2 -d \.  > $infile.peptide
+cat $infile | grep -v "Description" | awk 'BEGIN{FS="\t"}{print $3}' > $infile.peptide_tagged
+cat $infile | grep -v "Description" | awk 'BEGIN{FS="\t"}{print $3}' | sed 's/\*//g' | cut -f2 -d \.  > $infile.peptide
 
 # tagged and fwd
 for p1 in $mzxml
@@ -30,10 +30,10 @@ do
     do
 	pp=$(cat DTASelect-filter_$f\_*.fwd | awk -v frag=$p '(frag==$NF){print $1, $2, ";"}' );
 	echo $p $pp;
-    done  > DTASelect-filter_$f.match
-    echo $f > $infile\_$f.scan
-    cat DTASelect-filter_$f.match  | awk '{if (NF==1) print "none";else print $3}' >> $infile\_$f.scan
-    scanfiles="$scanfiles $infile"_$f.scan
+    done  > $infile.DTASelect-filter_$f.match
+    echo $f > $infile.$f.scan
+    cat $infile.DTASelect-filter_$f.match  | awk '{if (NF==1) print "none";else print $3}' >> $infile.$f.scan
+    scanfiles="$scanfiles $infile.$f.scan"
 done
 
 # mass
@@ -46,10 +46,20 @@ done >> $infile.peptide_mass
 echo "peptide" > $infile.peptide_seq
 cat $infile.peptide >> $infile.peptide_seq
 
-paste $infile.peptide_seq $infile.peptide_mass $scanfiles > $infile.txt.seq_mass_scan
+paste $infile.peptide_seq $infile.peptide_mass $scanfiles > $infile.seq_mass_scan
 
-R --vanilla --args $infile.txt $infile.txt.seq_mass_scan < /home/chuwang/svnrepos/R/findMs1AcrossSets.R > findMs1AcrossSets.Rout
+R --vanilla --args $infile $infile.seq_mass_scan < /home/chuwang/svnrepos/R/findMs1AcrossSets.R > $infile.findMs1AcrossSets.Rout
 
-cd output
-ps2pdf *.ps
+mkdir -p $infile\_output/PNG
+cd $infile\_output
+for p in $(\ls *.ps | sed 's/\.ps//g')
+do
+    convert $p.ps $p.png
+    mv $p*.png ./PNG/
+    ps2pdf $p.ps
+done
 cd ..
+
+mkdir -p $infile\_output/TEXT
+mv $infile.* $infile\_output/TEXT
+cp $infile $infile\_output

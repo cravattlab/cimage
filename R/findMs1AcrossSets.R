@@ -1,12 +1,6 @@
 library(xcms)
 source("/home/chuwang/svnrepos/R/msisotope.R")
 
-
-input.file.suffix <- ".mzXML"
-output.file.suffix <- ".ps"
-output.path <- "output"
-dir.create(output.path)
-
 ## probe's mass added to peptide
 probe.mass <- 464.28596
 ## 10 ppm to extract chromatographic peaks
@@ -21,23 +15,25 @@ Hplus.mass <- 1.0072765
 
 ## file name from input args
 args <- commandArgs(trailingOnly=T)
+output.path <- paste(args[1],"output",sep="_")
+dir.create(output.path)
 ## the table with protein names
-#original.table <- read.table(args[1],sep="\t", header=T)
+original.table <- read.table(args[1],sep="\t", header=T)
 ## the table with mass and scan number from DTASelect
-#cross.table <- read.table(args[2], header=T)
-#cross.table[,"mass"] <- cross.table[,"mass"] + probe.mass
+cross.table <- read.table(args[2], header=T)
+cross.table[,"mass"] <- cross.table[,"mass"] + probe.mass
 ## file name tags
-#cross.vec <- dimnames(cross.table)[[2]][-c(1,2)]
+cross.vec <- dimnames(cross.table)[[2]][-c(1,2)]
 
 ## find all matched input files in current directory
 input.path <- getwd()
-#mzXML.names <- list.files(path="./",pattern="mzXML$")
-#mzXML.files <- as.list( mzXML.names )
-#names(mzXML.files) <- mzXML.names
-#for (name in mzXML.names) {
-#  cat(paste(name,"\n",sep=""))
-#  mzXML.files[[name]] <- xcmsRaw( paste("./",name,sep=""), profstep=0, includeMSn=T)
-#}
+mzXML.names <- list.files(path="./",pattern="mzXML$")
+mzXML.files <- as.list( mzXML.names )
+names(mzXML.files) <- mzXML.names
+for (name in mzXML.names) {
+  cat(paste(name,"\n",sep=""))
+  mzXML.files[[name]] <- xcmsRaw( paste("./",name,sep=""), profstep=0, includeMSn=T)
+}
 
 
 ## retention time window in secs
@@ -224,13 +220,13 @@ for ( i in 1:dim(cross.table)[1] ) {
     mtext(tt, line=3.5, outer=T)
     mtext(paste(original.table[i,"Peptide_Sequence"],"; Mono.mass: ", as.character(mono.mass), sep=""),
           cex=0.8, line=2, out=T)
-    mtext(substr(original.table[i,"Description"], 1,100), line=1, cex=0.5,out=T)
+    mtext(substr(original.table[i,"Description"], 1,100), line=0.8, cex=0.8,out=T)
     ## save data in outdf
     original.df <- rbind( original.df, original.table[i,] )
     this.df <- data.frame(entry=i, mass=mass, charge=charge, segment=raw.index,
                           ir.1.1=ratios[1], ir.1.5=ratios[2], ir.1.10=ratios[3],
                           ar.1.1=0, ar.1.5=0, ar.1.10=0,
-                          link=paste('=HYPERLINK(\"./',out.filename.base,'-',as.character(all.count-1),'.png\")',sep=''))
+                          link=paste('=HYPERLINK(\"./PNG/',out.filename.base,'-',as.character(all.count-1),'.png\")',sep=''))
     out.df <- rbind(out.df, this.df)
   }
 } ## each entry
@@ -241,11 +237,15 @@ for (k in levels(as.factor(out.df[,"entry"])) ) {
   for ( m in 1:length(cross.vec) ) {
     v <- out.df[kk,m+4]
     v <- v[v>0]
-    out.df[kk,m+7] <- mean(v)
+    if ( length(v)>0) {
+      out.df[kk,m+7] <- mean(v)
+    } else {
+      out.df[kk,m+7] <- 0.0
+    }
   }
 }
 
 all.table <- cbind(original.df,out.df)
 row.names(all.table) <- as.character(seq(1:dim(all.table)[1]) )
-write.table(all.table,file=paste(output.path,"/",out.filename.base,".txt",sep=""), quote=F, sep="\t", row.names=F)
+write.table(all.table,file=paste(output.path,"/",out.filename.base,".to_excel.txt",sep=""), quote=F, sep="\t", row.names=F)
 
