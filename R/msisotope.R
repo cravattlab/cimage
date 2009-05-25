@@ -167,3 +167,31 @@ findPairChromPeaks <- function(rt, light.int, heavy.int, rt.range, sn=5) {
 #  }
 #  return(pair.range)
 #}
+
+readFileFromMsn <- function( xcms.raw ) {
+  filename <- xcms.raw@filepath
+  filename.base <- strsplit(filename,".mzXML")[[1]][1]
+  dtable <- read.table(paste(filename.base,".ms1.mz_int",sep=""), header=T)
+  xcms.raw@env$mz <- dtable[,"mz"]
+  xcms.raw@env$intensity <- dtable[,"int"]
+  dtable <- read.table(paste(filename.base,".ms1.index_table",sep=""), header=T)
+  xcms.raw@scanindex <- dtable[,"scanindex"]
+  xcms.raw@scantime  <- dtable[,"scantime"]
+  xcms.raw@acquisitionNum <- dtable[,"acquisitionNum"]
+  if ( length(xcms.raw@msnScanindex) > 0 ) {
+    dtable <- read.table(paste(filename.base,".ms2.mz_int",sep=""), header=T)
+    xcms.raw@env$msnMz <- dtable[,"mz"]
+    xcms.raw@env$msnIntensity <- dtable[,"int"]
+    dtable <- read.table(paste(filename.base,".ms2.index_table",sep=""), header=T)
+    xcms.raw@msnScanindex <- dtable[, "msnScanindex"]
+    xcms.raw@msnAcquisitionNum <- dtable[, "msnAcquisitionNum"]
+    xcms.raw@msnPrecursorScan <- dtable[, "msnPrecursorScan"]
+    xcms.raw@msnLevel <- dtable[, "msnLevel"]
+    xcms.raw@msnRt <- dtable[, "msnRt"]
+    xcms.raw@msnPrecursorMz <- dtable[, "msnPrecursorMz"]
+    xcms.raw@msnPrecursorIntensity <- dtable[, "msnPrecursorIntensity"]
+    xcms.raw@msnPrecursorCharge <- rep(1, length(xcms.raw@msnPrecursorIntensity))
+    xcms.raw@msnCollisionEnergy <- rep(xcms.raw@msnCollisionEnergy[1], length(xcms.raw@msnPrecursorIntensity))
+  }
+  return( xcms.raw )
+}

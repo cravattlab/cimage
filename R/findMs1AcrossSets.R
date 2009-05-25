@@ -35,6 +35,11 @@ for (name in mzXML.names) {
   mzXML.files[[name]] <- xcmsRaw( paste("./",name,sep=""), profstep=0, includeMSn=T)
 }
 
+##special case for raw file corruption
+##ex2 <- mzXML.files[[2]]
+##new.ex2 <- readFileFromMsn( ex2 )
+#mzXML.files[[2]] <- new.ex2
+##
 
 ## retention time window in secs
 rt.window <- 5
@@ -46,9 +51,12 @@ out.filename.base <- paste("output_rt_",as.character(rt.window),"_sn_",
 out.filename <- paste(output.path,"/",out.filename.base,".ps",sep="")
 ## make plot for each isotopic cluster
 ##png(out.filename)
-out.df <- data.frame(entry=numeric(0), mass=numeric(0), charge=numeric(0), segment=character(0),
+out.df <- data.frame(mass=numeric(0), charge=numeric(0), segment=character(0),
                      ir.1.1=numeric(0), ir.1.5=numeric(0), ir.1.10=numeric(0),
-                     ar.1.1=numeric(0), ar.1.5=numeric(0), ar.1.10=numeric(0),link=character(0))
+                     irsq.1.1=numeric(0), irsq.1.5=numeric(0), irsq.1.10=numeric(0),
+                     ar.1.1=numeric(0), ar.1.5=numeric(0), ar.1.10=numeric(0),
+                     arsq.1.1=numeric(0), arsq.1.5=numeric(0), arsq.1.10=numeric(0),
+                     entry=numeric(0), link=character(0))
 original.df <- original.table[F,]
 postscript( out.filename, horizontal=F)
 layout(matrix(c(1,1,2,3,3,4,5,5,6), 3, 3, byrow = T))
@@ -92,7 +100,7 @@ for ( i in 1:dim(cross.table)[1] ) {
       ms1.scan.num[k] <- which(xfile@acquisitionNum > as.integer(raw.scan.num[kk]))[1]-1
     }
 
-    ratios <- rep(0,length(cross.vec))
+    r2.v <- ratios <- rep(0,length(cross.vec))
     for ( j in 1:length(cross.vec) ) {
       raw.file <- paste( cross.vec[j], "_", raw.index,".mzXML",sep="")
       xfile <- mzXML.files[[raw.file]]
@@ -164,7 +172,7 @@ for ( i in 1:dim(cross.table)[1] ) {
           light.yes <- raw.ECI.light[[2]][yes]
           heavy.yes <- raw.ECI.heavy[[2]][yes]
           ## calculate ratio of integrated peak area
-          ratio <- sum(light.yes)/sum(heavy.yes)
+          ratio <- round(sum(light.yes)/sum(heavy.yes),digits=2)
           if (ratio > 15 ) next
           lines(c(low,low),ylimit/10, col="green")
           lines(c(high,high),ylimit/10, col="green")
@@ -182,7 +190,7 @@ for ( i in 1:dim(cross.table)[1] ) {
             heavy.yes <- c(1,heavy.yes)
           }
           x.lm <- lsfit( x=log10(light.yes), y=log10(heavy.yes) )
-          r2 <- as.numeric(ls.print(x.lm,print.it=F)$summary[1,2])
+          r2 <- round(as.numeric(ls.print(x.lm,print.it=F)$summary[1,2]),digits=2)
           if ( !is.na(tag.rt) & tag.rt>=low & tag.rt<=high) {
             best.fixed <- T
           }
@@ -210,6 +218,7 @@ for ( i in 1:dim(cross.table)[1] ) {
         abline(best.xlm[1],best.xlm[2])
         abline(0,1,col="grey")
         ratios[j] <- best.ratio
+        r2.v[j] <- best.r2
       } else {
         plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
       }
@@ -223,10 +232,12 @@ for ( i in 1:dim(cross.table)[1] ) {
     mtext(substr(original.table[i,"Description"], 1,100), line=0.8, cex=0.8,out=T)
     ## save data in outdf
     original.df <- rbind( original.df, original.table[i,] )
-    this.df <- data.frame(entry=i, mass=mass, charge=charge, segment=raw.index,
+    this.df <- data.frame(mass=mass, charge=charge, segment=raw.index,
                           ir.1.1=ratios[1], ir.1.5=ratios[2], ir.1.10=ratios[3],
+                          irsq.1.1=r2.v[1], irsq.1.5=r2.v[2], irsq.1.10=r2.v[3],
                           ar.1.1=0, ar.1.5=0, ar.1.10=0,
-                          link=paste('=HYPERLINK(\"./PNG/',out.filename.base,'-',as.character(all.count-1),'.png\")',sep=''))
+                          arsq.1.1=0, arsq.1.5=0, arsq.1.10=0,
+                          entry=i,link=paste('=HYPERLINK(\"./PNG/',out.filename.base,'-',as.character(all.count-1),'.png\")',sep=''))
     out.df <- rbind(out.df, this.df)
   }
 } ## each entry
@@ -235,17 +246,34 @@ dev.off()
 for (k in levels(as.factor(out.df[,"entry"])) ) {
   kk <- which(as.factor(out.df[,"entry"]) == k )
   for ( m in 1:length(cross.vec) ) {
-    v <- out.df[kk,m+4]
+    ## average non-zero ratio
+    v <- out.df[kk,m+3]
     v <- v[v>0]
     if ( length(v)>0) {
-      out.df[kk,m+7] <- mean(v)
+      out.df[kk,m+9] <- round(mean(v),digits=2)
     } else {
-      out.df[kk,m+7] <- 0.0
+      out.df[kk,m+9] <- 0.0
+    }
+    ## average non-zero R2
+    v <- out.df[kk,m+6]
+    v <- v[v>0]
+    if ( length(v)>0) {
+      out.df[kk,m+12] <- round(mean(v),digits=2)
+    } else {
+      out.df[kk,m+12] <- 0.0
     }
   }
 }
 
 all.table <- cbind(original.df,out.df)
-row.names(all.table) <- as.character(seq(1:dim(all.table)[1]) )
-write.table(all.table,file=paste(output.path,"/",out.filename.base,".to_excel.txt",sep=""), quote=F, sep="\t", row.names=F)
+s1 <- all.table[,"ar.1.10"]
+s2 <- all.table[,"entry"]
+s3 <- all.table[,"charge"]
+s4 <- all.table[,"segment"]
+ii <- order(s1, s2, s3, s4)
+all.table.sort <- all.table[ii,]
+ii.zero <- (all.table.sort[,"ar.1.10"] == 0.0)
+all.table.out <- rbind( all.table.sort[!ii.zero,], all.table.sort[ii.zero,] )
+row.names(all.table.out) <- as.character(seq(1:dim(all.table.out)[1]) )
+write.table(all.table.out,file=paste(output.path,"/",out.filename.base,".to_excel.txt",sep=""), quote=F, sep="\t", row.names=F)
 

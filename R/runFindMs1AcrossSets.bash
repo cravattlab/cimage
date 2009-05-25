@@ -18,7 +18,7 @@ do
     for p2 in $(ls DTASelect-filter_$p1\_*.txt);
     do
 	/home/chuwang/svnrepos/python/tagDTASelect.py $p2 > $p2.tagged;
-	cat $p2.tagged | grep "^IPI:IPI" | sed 's/\ \*//g' > $p2.tagged.fwd;
+	cat $p2.tagged | grep "^IPI" | sed 's/\ \*//g' > $p2.tagged.fwd;
     done
 done
 
