@@ -20,9 +20,12 @@ for line in open(argv[1]):
         tag=''
         print line
         continue
-    if words[0].find('IPI:IPI') != -1:
+    if words[0].find('IPI') != -1:
         i = words[0].find("|")
-        tag = words[0][0:i] if i else words[0]
+        if i>0:
+            tag = words[0][0:i]
+        else:
+            tag = words[0]
         print line
     else:
         print tag, line
