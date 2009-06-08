@@ -10,25 +10,52 @@ if len(argv) != 2:
     print 'tag each peptide line in DTASelect output file with its IPI name at beginning'
     sys.exit(-1)
 
-# get current IPI tag
+## list to save ipi and peptide lines in case multiple protein with the same peptides
+ipi_lines = []
+pep_lines = []
 tag=''
+last_line_is_peptide = False
+## control header and tail printing
+print_on = True
+
 for line in open(argv[1]):
     line = line.rstrip()
     words = line.split()
-    # none peptide entry line
-    if len(words) <= 5:
-        tag=''
-        print line
+    if len(words) == 0:
+        print
         continue
-    if words[0].find('IPI') != -1:
-        i = words[0].find("|")
-        if i>0:
-            tag = words[0][0:i]
+    # none peptide entry line
+    if words[0].find('IPI0') != -1 or words[0]=='Proteins':
+        if words[0]=='Proteins':
+            print_on = True
         else:
-            tag = words[0]
-        print line
+            print_on = False
+
+        if last_line_is_peptide:
+            # print out saved lines
+            for ipi in ipi_lines:
+                print ipi
+                # find tag
+                ipi_words = ipi.split()
+                i = ipi_words[0].find("|")
+                if i>0:
+                    tag = ipi_words[0][0:i]
+                else:
+                    tag = ipi_words[0]
+                # print out tagged lines
+                for pep in pep_lines:
+                    print tag, pep[1:]
+            # emtpy lists
+            ipi_lines = []
+            pep_lines = []
+
+        if not print_on:
+            ipi_lines.append(line)
+            last_line_is_peptide = False
     else:
-        print tag, line
+        if not print_on:
+            pep_lines.append(line)
+            last_line_is_peptide = True
 
-
-
+    if print_on:
+        print line
