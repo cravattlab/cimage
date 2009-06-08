@@ -251,7 +251,11 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   predicted.mass <- charge*peaks.mz1[1]
   predicted.comp <- averagine.count( predicted.mass)
   predicted.dist <- isotope.dist(predicted.comp)
-  predicted.max.index <- which.max(predicted.dist) # control how windows is slided
+  ## this is for the situation where a noisy satelite peak on the far left
+  left.pad <- 5
+  predicted.dist <- c( rep(0, left.pad), predicted.dist )
+  ## when slide the window, be sure to always include the top 2 intensive peaks
+  predicted.max.index <- min(order(predicted.dist,decreasing=T)[1:2]) ##which.max(predicted.dist) # control how windows is slided
   predicted.dist.merge <- c(predicted.dist,rep(0,mass.shift)) + c(rep(0,mass.shift),predicted.dist)
   predicted.dist.merge <- predicted.dist.merge/max(predicted.dist.merge)
   observed.mz <- c(peaks.mz1, peaks.mz2)
@@ -271,17 +275,20 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   picpt <- rep(0,predicted.max.index)
   for (s in 1:predicted.max.index) { # when sliding, never omit the most intensive predicted peak
     predicted.maxo <- predicted.dist.merge[observed.index+s]
-    fit <-  lsfit(predicted.maxo,observed.maxo)
+    fit <-  lsfit(c(predicted.maxo,0), c(observed.maxo,0))
+    #fit <-  lm(observed.maxo ~ -1 + predicted.maxo)
     pcor[s] <- fit[[1]][2]
     picpt[s] <- fit[[1]][1]
   }
   ##best.shift <- which.max(pcor) - 1
   ##best.pcor <- max(pcor)
-  best.shift <- which.min(abs(pcor-1.0))
+  ##best.shift <- which.min(abs(pcor-1.0))
+  best.shift <- which.min(abs(picpt))
   best.pcor <- pcor[best.shift]
-  best.shift <- best.shift-1
+  best.shift <- best.shift-1-left.pad
   predicted.mono.mz <- peaks.mz1[1] - best.shift*isotope.mz.delta
-  upper.bound <- max( which(predicted.dist.merge> 0.01) )
+  predicted.dist.merge <- predicted.dist.merge[-(1:left.pad)]
+  upper.bound <- max( which(predicted.dist.merge> 0.05) )
   upper.bound.mz <- predicted.mono.mz + (upper.bound-1)*isotope.mz.delta
   predicted.mz <- predicted.mono.mz + seq(0,upper.bound-1)*isotope.mz.delta
   predicted.int <- predicted.dist.merge[1:upper.bound]
@@ -304,8 +311,8 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   scan.data <- getScan(xfile, best.scan.number, massrange=mass.range)
   scan.mz <- scan.data[,"mz"]
   scan.int <- scan.data[,"intensity"]
-  tmp <- (scan.mz >= min(peaks.mz1) & scan.mz <= max(peaks.mz2) )
-  ##scan.mz.zoom <- scan.mz[ tmp ]
+  tmp <- (scan.mz >= min(peaks.mz1)*(1-mz.ppm.cut) & scan.mz <= max(peaks.mz2)*(1+mz.ppm.cut) )
+  scan.mz.zoom <- scan.mz[ tmp ]
   scan.int.zoom <- scan.int[ tmp ]
   ## the most intensive peak should match one of the pairs
   ## tmp.mz <- scan.mz.zoom[ order(scan.int.zoom)[length(scan.int.zoom)] ]
@@ -367,7 +374,7 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
                "; avg(r):", formatC(avg.residual,digits=2) ), line=0.5
         )
   title( sub=paste("Scan # ", best.scan.number, " @ ", round(xfile@scantime[best.scan.number], 1),
-               " sec (raw # ", (best.scan.number-1)*(num.ms2.per.ms1+1)+1, " @ ",
+               " sec (raw # ", xfile@acquisitionNum[best.scan.number], " @ ",
                round(xfile@scantime[best.scan.number]/60,1)," min)", sep = "")
         )
   ##ymark <- min( scan.data[,2] ) + 10
@@ -385,7 +392,7 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
   plot(raw.ECI.light[[1]], raw.ECI.light[[2]], type="l", col="red",xlab="scan #", ylab="intensity",
        main=paste("Chromatogram of", as.character(format(peak.mz1, digits=7)),
-         "and", as.character(format(peak.mz2,digits=7)), "m/z (C)"), xlim=xlimit, ylim=ylimit)
+         "and", as.character(format(peak.mz2,digits=7)), "m/z"), xlim=xlimit, ylim=ylimit)
   lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
   peak.mz1.i <- which( abs(predicted.mz-peak.mz1)/peak.mz1 < 2*mz.ppm.cut )
   ms2.yes <- which( predicted.mz.ms2[,peak.mz1.i] > 0 )
