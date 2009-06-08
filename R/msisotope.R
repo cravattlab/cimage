@@ -113,7 +113,7 @@ findPairChromPeaks <- function(rt, light.int, heavy.int, rt.range, sn=5) {
   dimnames(m.heavy)[[2]] <- c("rt","intensity")
   m.heavy <- m.heavy[rt>=rt.range[1]&rt<=rt.range[2],]
   noise.heavy <- estimateChromPeakNoise(m.heavy[,"intensity"])
-  peaks.heavy <- findChromPeaks(m.heavy,sn,rtgap=5*rtdiff)
+  peaks.heavy <- findChromPeaks(m.heavy,sn,rtgap=0.5)
   n.heavy <- dim(peaks.heavy)[[1]]
 
   pair.range <- c(noise.light, noise.heavy)
