@@ -2,7 +2,8 @@ library(xcms)
 source("/home/chuwang/svnrepos/R/msisotope.R")
 
 ## probe's mass added to peptide
-probe.mass <- 464.28596
+probe.mass <- c(464.28596)
+names(probe.mass) <- c("C")
 ## 10 ppm to extract chromatographic peaks
 mz.ppm.cut <- 0.000010
 # From Eranthie's isotopically labeled probe
@@ -35,12 +36,12 @@ ncross <- length(cross.vec)
 
 ## find all matched input files in current directory
 input.path <- getwd()
-mzXML.names <- list.files(path="./",pattern="mzXML$")
+mzXML.names <- list.files(path="../",pattern="mzXML$")
 mzXML.files <- as.list( mzXML.names )
 names(mzXML.files) <- mzXML.names
 for (name in mzXML.names) {
   cat(paste(name,"\n",sep=""))
-  mzXML.files[[name]] <- xcmsRaw( paste("./",name,sep=""), profstep=0, includeMSn=T)
+  mzXML.files[[name]] <- xcmsRaw( paste("../",name,sep=""), profstep=0, includeMSn=T)
 }
 
 ##special case for raw file corruption
@@ -54,25 +55,25 @@ rt.window <- 5
 rt.window.width <- rt.window * 60
 ## signal/noise ratio for peak picking
 sn <- 2.5
+
+## column names for calculated ratios
+integrated.area.ratio <- paste("IR",cross.vec,sep=".")
+linear.regression.ratio <- paste("LR",cross.vec,sep=".")
+linear.regression.R2 <- paste("R2",cross.vec,sep=".")
+column.names <- c("index","ipi", "description", "symbol", "sequence", "mass", "charge", "segment",
+                  integrated.area.ratio, linear.regression.ratio, linear.regression.R2, "entry", "link" )
+out.df <- matrix(nrow=0, ncol=length(column.names))
+colnames(out.df) <- column.names
+
+## output layout
 out.filename.base <- paste("output_rt_",as.character(rt.window),"_sn_",
                       as.character(sn),sep="")
 out.filename <- paste(output.path,"/",out.filename.base,".ps",sep="")
-## make plot for each isotopic cluster
-##png(out.filename)
-out.df <- data.frame(index=numeric(0), ipi=character(0), description=character(0),
-                     symbol=character(0), sequence=character(0),
-                     mass=numeric(0), charge=numeric(0), segment=character(0),
-                     ir.1.1=numeric(0), ir.1.5=numeric(0), ir.1.10=numeric(0),
-                     lr.1.1=numeric(0), lr.1.5=numeric(0), lr.1.10=numeric(0),
-                     rsq.1.1=numeric(0), rsq.1.5=numeric(0), rsq.1.10=numeric(0),
-                     entry=numeric(0), link=character(0)
-##                     ar.1.1=numeric(0), ar.1.5=numeric(0), ar.1.10=numeric(0),
-##                     arsq.1.1=numeric(0), arsq.1.5=numeric(0), arsq.1.10=numeric(0),
-)
-#original.df <- ipi.name.table[F,]
+
 postscript( out.filename, horizontal=F)
-layout(matrix(c(1,1,2,3,3,4,5,5,6), 3, 3, byrow = T))
-#par(mfrow=c(ncross,1))
+layout.vec <- seq(1,ncross)
+layout.matrix <- cbind(2*layout.vec-1, 2*layout.vec-1, 2*layout.vec)
+layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
 for ( i in 1:dim(cross.table)[1] ) {
@@ -86,8 +87,9 @@ for ( i in 1:dim(cross.table)[1] ) {
   entry.index <- which( entry.tag == entry.levels )
   description <- as.character(ipi.name.table[ipi,"name"])
   symbol<- strsplit(description, " ")[[1]][1]
-  nmod <- length(strsplit(as.character(peptide),"*",fixed=T)[[1]])-1
-  mono.mass  <- cross.table[i,"mass"]+nmod*probe.mass
+  peptide.vec <- unlist( strsplit(peptide,"",fixed=T) )
+  modified.mass <- sum( probe.mass[peptide.vec[which(peptide.vec=="*")-1]] )
+  mono.mass  <- cross.table[i,"mass"]+modified.mass
   mass <- mono.mass + (which.max(isotope.dist( averagine.count(mono.mass) )) - 1)*isotope.mass.unit
   raw.scan.num <- cross.table[i,cross.vec]
 
@@ -138,17 +140,12 @@ for ( i in 1:dim(cross.table)[1] ) {
     ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
     ylimit[1] <- 0.0
     ylimit[2] <- ylimit[2]*1.2
-    ##xlimit <- range(c(raw.ECI.light[[1]], raw.ECI.heavy[[1]]))
-    ##ylimit <- range(c(raw.ECI.light[[2]], raw.ECI.heavy[[2]]))
     xlimit <- c(rt.min,rt.max)/60
     raw.ECI.light.rt <- xfile@scantime[ raw.ECI.light[[1]] ] / 60
     raw.ECI.heavy.rt <- xfile@scantime[ raw.ECI.heavy[[1]] ] / 60
-    ##if ( tag=="*") {
+
     tt.main <- paste(tag, raw.file, "; Raw Scan:", as.character(raw.scan.num[j]),
                      "; NL:", formatC(ylimit[2], digits=2, format="e"))
-    ##} else {
-    ##  tt.main <- paste(tag, raw.file, "; Census ratio: NA; Raw Scan: NA")
-    ##}
     plot(raw.ECI.light.rt, raw.ECI.light[[2]], type="l", col="red",xlab="Retention Time(min)",
          ylab="intensity", main=tt.main, xlim=xlimit,ylim=ylimit)
     lines(raw.ECI.heavy.rt, raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
@@ -197,11 +194,6 @@ for ( i in 1:dim(cross.table)[1] ) {
         if (npoints<5) {
           next
         }
-        ##} else if ( npoints<3) {
-        ##  light.yes <- c(1,light.yes)
-        ##  heavy.yes <- c(1,heavy.yes)
-        ##}
-        ##          x.lm <- lsfit( x=log10(light.yes), y=log10(heavy.yes) )
         x.lm <- lsfit( x=heavy.yes, y=light.yes,intercept=F )
         r2 <- round(as.numeric(ls.print(x.lm,print.it=F)$summary[1,2]),digits=2)
         if ( !is.na(tag.rt) & tag.rt>=low & tag.rt<=high) {
@@ -223,19 +215,12 @@ for ( i in 1:dim(cross.table)[1] ) {
     if ( best.r2 != 0 ) {
       lines(c(best.low,best.low),ylimit, col="green")
       lines(c(best.high,best.high),ylimit, col="green")
-      ##        plot(log10(best.light.yes),log10(best.heavy.yes),
-      ##             xlab="log10(intensity.light)", ylab="log10(intensity.heavy)",
-      ##             main=paste("R2 value:",format(best.r2,digits=3)),
-      ##             xlim=range(log10(best.light.yes),log10(best.heavy.yes)),
-      ##             ylim=range(log10(best.light.yes),log10(best.heavy.yes)))
-
       plot(best.heavy.yes,best.light.yes,
            xlab="intensity.heavy", ylab="intensity.light",
            main=paste("X=",format(best.xlm,digits=4),"; R2=",format(best.r2,digits=3),
              "; Np=", best.npoints, sep=""),
            xlim=c(0, max(best.light.yes,best.heavy.yes)),
            ylim=c(0, max(best.light.yes,best.heavy.yes)))
-      ##abline(best.xlm[1],best.xlm[2])
       abline(0,best.xlm)
       abline(0,1,col="grey")
       i.ratios[j] <- best.ratio
@@ -253,81 +238,35 @@ for ( i in 1:dim(cross.table)[1] ) {
         cex=0.8, line=2, out=T)
   mtext(paste(cross.table[i,"ipi"],description),line=0.8, cex=0.8,out=T)
   ## save data in outdf
-  ##original.df <- rbind( original.df, ipi.name.table[i,] )
-  this.df <- data.frame(index=i, ipi=ipi, description=description, symbol=symbol, sequence=peptide,
-                        mass=round(mass,digits=4), charge=charge, segment=segment,
-                        ir.1.1=i.ratios[1], ir.1.5=i.ratios[2], ir.1.10=i.ratios[3],
-                        lr.1.1=l.ratios[1], lr.1.5=l.ratios[2], lr.1.10=l.ratios[3],
-                        rsq.1.1=r2.v[1], rsq.1.5=r2.v[2], rsq.1.10=r2.v[3],
-                        ##                          ar.1.1=0, ar.1.5=0, ar.1.10=0,
-                        ##                          arsq.1.1=0, arsq.1.5=0, arsq.1.10=0,
-                        entry=entry.index, link=paste('=HYPERLINK(\"./PNG/', out.filename.base,'-',
-                                             as.character(i-1),'.png\")',sep=''))
+  this.df <- c(i, ipi, description, symbol, peptide, round(mass,digits=4), charge, segment,
+               i.ratios, l.ratios, r2.v, entry.index,
+               paste('=HYPERLINK(\"./PNG/', out.filename.base,'-', as.character(i-1),'.png\")',sep=''))
+  names(this.df) <- column.names
   out.df <- rbind(out.df, this.df)
 } ## each entry
 dev.off()
 
-##for (k in levels(as.factor(out.df[,"entry"])) ) {
-##  kk <- which(as.factor(out.df[,"entry"]) == k )
-## for ( m in 1:ncross ) {
-##    ## average non-zero ratio
-##    v <- out.df[kk,m+3]
-##    v <- v[v>0]
-##   if ( length(v)>0) {
-##     out.df[kk,m+9] <- round(mean(v),digits=2)
-##   } else {
-##     out.df[kk,m+9] <- 0.0
-##   }
-## average non-zero R2
-##   v <- out.df[kk,m+6]
-##   v <- v[v>0]
-##   if ( length(v)>0) {
-##     out.df[kk,m+12] <- round(mean(v),digits=2)
-##   } else {
-##     out.df[kk,m+12] <- 0.0
-##   }
-## }
-##}
-
-
-all.table <- out.df##cbind(original.df,out.df)
-
+all.table <- out.df
+all.table.out <- all.table[F,]
 rsq.cutoff <- 0.9
-## first apply rsq.1.10 cutoff and sort by ir.1.10
-rsq.filter1 <- all.table[,"rsq.1.10"] >= rsq.cutoff & !is.na(all.table[,"rsq.1.10"])
-table1 <- all.table[rsq.filter1,]
-s1 <- table1[,"ir.1.10"]
-s2 <- table1[,"entry"]
-s3 <- table1[,"charge"]
-s4 <- table1[,"segment"]
-ii <- order(s1, s2, s3, s4)
-table1 <- table1[ii,]
-## then select by rsq.1.5 cutoff and sort by ir.1.5
-all.table <- all.table[!rsq.filter1,]
-rsq.filter2 <- all.table[,"rsq.1.5"] >= rsq.cutoff & !is.na(all.table[,"rsq.1.5"])
-table2 <- all.table[rsq.filter2,]
-s1 <- table2[,"ir.1.5"]
-s2 <- table2[,"entry"]
-s3 <- table2[,"charge"]
-s4 <- table2[,"segment"]
-ii <- order(s1, s2, s3, s4)
-table2 <- table2[ii,]
-## then select by rsq.1.1 cutoff and sort by ir.1.1
-all.table <- all.table[!rsq.filter2,]
-rsq.filter3 <- all.table[,"rsq.1.1"] >= rsq.cutoff & !is.na(all.table[,"rsq.1.1"])
-table3 <- all.table[rsq.filter3,]
-s1 <- table3[,"ir.1.1"]
-s2 <- table3[,"entry"]
-s3 <- table3[,"charge"]
-s4 <- table3[,"segment"]
-ii <- order(s1, s2, s3, s4)
-table3 <- table3[ii,]
-##
-table4 <- all.table[!rsq.filter3,]
 
-all.table.out <- rbind(table1, table2, table3, table4)
-#ii.zero <- (all.table.sort[,"ar.1.10"] == 0.0)
-#all.table.out <- rbind( all.table.sort[!ii.zero,], all.table.sort[ii.zero,] )
+## go from high concentration to low concentration,
+## first apply R2 cutoff and sort by IR values
+for ( s in seq(ncross, 1) ) {
+  colname.R2 <- linear.regression.R2[s]
+  colname.IR <- integrated.area.ratio[s]
+  rsq.filter <- all.table[,colname.R2] >= rsq.cutoff & !is.na(all.table[,colname.R2])
+  table <- all.table[rsq.filter,]
+  s1 <- as.numeric(table[,colname.IR])
+  s2 <- as.numeric(table[,"entry"])
+  s3 <- as.numeric(table[,"charge"])
+  s4 <- as.numeric(table[,"segment"])
+  ii <- order(s1, s2, s3, s4)
+  table <- table[ii,]
+  all.table.out <- rbind(all.table.out, table)
+  all.table <- all.table[!rsq.filter,]
+}
+## output the final table
 row.names(all.table.out) <- as.character(seq(1:dim(all.table.out)[1]) )
 all.table.out[,"index"] <- seq(1:dim(all.table.out)[1])
 write.table(all.table.out,file=paste(output.path,"/",out.filename.base,".to_excel.txt",sep=""), quote=F, sep="\t", row.names=F,na="0.00")

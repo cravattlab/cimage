@@ -86,7 +86,7 @@ cat tmp.key_scan | awk '{print $NF, $1, $2}' >> all_scan.table
 rm -rf tmp.ipi tmp.name tmp.ipi_name tmp.key_scan tmp.seq_mass  *.tmp.scan
 
 echo Running xcms to extract chromatographic peaks
-R --vanilla --args $mzxml < /home/chuwang/svnrepos/R/findMs1AcrossSetsFromDTASelect.R > $infile.findMs1AcrossSetsFromDTASelect.Rout
+R --vanilla --args $mzxml < /home/chuwang/svnrepos/R/findMs1AcrossSetsFromDTASelect.R > findMs1AcrossSetsFromDTASelect.Rout
 
 echo Generating graphs
 mkdir -p output/PNG
