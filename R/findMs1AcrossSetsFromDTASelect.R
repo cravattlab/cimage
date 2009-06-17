@@ -97,12 +97,16 @@ for ( i in 1:dim(cross.table)[1] ) {
   mz.light <- mass/charge + Hplus.mass
   mz.heavy <- (mass+pair.mass.delta)/charge + Hplus.mass
   ## scan number
-  ms1.scan.num <- exist.index <- which( raw.scan.num > 0 )
+  ms1.scan.rt <- ms1.scan.num <- exist.index <- which( raw.scan.num > 0 )
   for ( k in 1:length(exist.index) ) {
     kk <- exist.index[k]
     raw.file <- paste( cross.vec[kk], "_", segment,".mzXML",sep="")
     xfile <- mzXML.files[[raw.file]]
     ms1.scan.num[k] <- which(xfile@acquisitionNum > as.integer(raw.scan.num[kk]))[1]-1
+    if (is.na(ms1.scan.num[k])) {
+      ms1.scan.num[k] <- length(xfile@acquisitionNum)
+    }
+    ms1.scan.rt[k] <- xfile@scantime[ms1.scan.num[k]]
   }
 
   r2.v <- l.ratios <- i.ratios <- rep(NA,ncross)
@@ -122,19 +126,26 @@ for ( i in 1:dim(cross.table)[1] ) {
     ##chromatogram bottom
     raw.ECI.light <- rawEIC(xfile, c(mz.light*(1-mz.ppm.cut), mz.light*(1+mz.ppm.cut)) )
     raw.ECI.heavy <- rawEIC(xfile, c(mz.heavy*(1-mz.ppm.cut), mz.heavy*(1+mz.ppm.cut)) )
-    rt.min <- xfile@scantime[min(ms1.scan.num)]-rt.window.width
-    if (is.na(rt.min) ) {
-      rt.min <- xfile@scantime[length(xfile@scantime)] - 2*rt.window.width
+    scan.time.range <- range(xfile@scantime)
+    rt.min <- min(ms1.scan.rt)-rt.window.width
+    if (rt.min > scan.time.range[2]) {
+      rt.min <- scan.time.range[2] - 2*rt.window.width
     } else {
-      rt.min <- max(rt.min, xfile@scantime[1] )
+      rt.min <- max(rt.min, scan.time.range[1] )
     }
-    rt.max <- xfile@scantime[max(ms1.scan.num)]+rt.window.width
-    if (is.na(rt.max) ) {
-      rt.max <- xfile@scantime[length(xfile@scantime)]
+    rt.max <- max(ms1.scan.rt)+rt.window.width
+    if (rt.max < scan.time.range[1] ) {
+      rt.max <- scan.time.range[1] + 2*rt.window.width
     } else {
-      rt.max <- min(rt.max,xfile@scantime[length(xfile@scantime)])
+      rt.max <- min(rt.max,scan.time.range[2])
     }
-    if ( (rt.max - rt.min) < 2*rt.window.width ) rt.min <- rt.max-2*rt.window.width
+    if ( (rt.max - rt.min) < 2*rt.window.width ) {
+      if ( rt.max == scan.time.range[2] ) {
+        rt.min <- rt.max - 2*rt.window.width
+      } else if (rt.min == scan.time.range[1]) {
+        rt.max <- rt.min + 2*rt.window.width
+      }
+    }
     xlimit <-c(which(xfile@scantime>rt.min)[1]-1, which(xfile@scantime>rt.max)[1] )
     if (is.na(xlimit[2]) ) xlimit[2] <- length(xfile@scantime)
     ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
@@ -248,7 +259,7 @@ dev.off()
 
 all.table <- out.df
 all.table.out <- all.table[F,]
-rsq.cutoff <- 0.9
+rsq.cutoff <- 0.8
 
 ## go from high concentration to low concentration,
 ## first apply R2 cutoff and sort by IR values
@@ -266,6 +277,7 @@ for ( s in seq(ncross, 1) ) {
   all.table.out <- rbind(all.table.out, table)
   all.table <- all.table[!rsq.filter,]
 }
+all.table.out <- rbind(all.table.out, all.table)
 ## output the final table
 row.names(all.table.out) <- as.character(seq(1:dim(all.table.out)[1]) )
 all.table.out[,"index"] <- seq(1:dim(all.table.out)[1])
