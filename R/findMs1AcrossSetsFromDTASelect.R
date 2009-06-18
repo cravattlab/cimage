@@ -53,6 +53,8 @@ for (name in mzXML.names) {
 ## retention time window in secs
 rt.window <- 5
 rt.window.width <- rt.window * 60
+local.rt.window <- 2
+local.rt.window.width <- local.rt.window * 60
 ## signal/noise ratio for peak picking
 sn <- 2.5
 
@@ -151,7 +153,7 @@ for ( i in 1:dim(cross.table)[1] ) {
     ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
     ylimit[1] <- 0.0
     ylimit[2] <- ylimit[2]*1.2
-    xlimit <- c(rt.min,rt.max)/60
+    local.xlimit <- xlimit <- c(rt.min,rt.max)/60
     raw.ECI.light.rt <- xfile@scantime[ raw.ECI.light[[1]] ] / 60
     raw.ECI.heavy.rt <- xfile@scantime[ raw.ECI.heavy[[1]] ] / 60
 
@@ -170,9 +172,15 @@ for ( i in 1:dim(cross.table)[1] ) {
       }
       ##lines(c(tag.rt,tag.rt),c(0.0, max(raw.ECI.light[[2]],raw.ECI.heavy[[2]])), col="green")
       points(tag.rt, raw.ECI.light[[2]][tag.ms1.scan.num], type='p',pch=8)
+
+      ## guess ratio of integrated peak area
+      local.xlimit <- c(max(scan.time.range[1]/60, tag.rt-local.rt.window),
+                        min(scan.time.range[2]/60, tag.rt+local.rt.window))
     }
     ## guess ratio of integrated peak area
-    peaks <- findPairChromPeaks( raw.ECI.light.rt, raw.ECI.light[[2]], raw.ECI.heavy[[2]],xlimit,sn )
+    peaks <- findPairChromPeaks( raw.ECI.light.rt, raw.ECI.light[[2]], raw.ECI.heavy[[2]],
+                                xlimit, local.xlimit, sn )
+
     noise.light <- peaks[1]
     lines(xlimit,c(noise.light, noise.light), col='red', type='l', lty=2)
     noise.heavy <- peaks[2]

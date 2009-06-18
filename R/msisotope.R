@@ -73,9 +73,9 @@ estimateChromPeakNoise <- function(intensity) {
   mean(intensity)
 }
 
-findChromPeaks <- function(spec, sn=5, rtgap=0.2 ) {
+findChromPeaks <- function(spec, noise, sn=5, rtgap=0.2 ) {
 
-  noise <- estimateChromPeakNoise(spec[,"intensity"] )
+##  noise <- estimateChromPeakNoise(spec[,"intensity"] )
 
   spectab <- matrix(nrow = 0, ncol = 4)
   colnames(spectab) <- c("rt", "rt.min", "rt.max", "sn")
@@ -99,21 +99,27 @@ findChromPeaks <- function(spec, sn=5, rtgap=0.2 ) {
     spectab
 }
 
-findPairChromPeaks <- function(rt, light.int, heavy.int, rt.range, sn=5) {
+findPairChromPeaks <- function(rt, light.int, heavy.int, rt.range, local.rt.range, sn=5) {
   rtdiff <- mean( diff(rt) )
 
   m.light <- cbind(rt,light.int)
   dimnames(m.light)[[2]] <- c("rt","intensity")
-  m.light <- m.light[rt>=rt.range[1]&rt<=rt.range[2],]
-  noise.light <- estimateChromPeakNoise(m.light[,"intensity"])
-  peaks.light <- findChromPeaks(m.light,sn,rtgap=0.5)
+  m.light.global <- m.light[rt>=rt.range[1]&rt<=rt.range[2],]
+  noise.light.global <- estimateChromPeakNoise(m.light.global[,"intensity"])
+  m.light.local  <- m.light[rt>=local.rt.range[1]&rt<=local.rt.range[2],]
+  noise.light.local <- estimateChromPeakNoise(m.light.local[,"intensity"])
+  noise.light <- min( noise.light.global, noise.light.local )
+  peaks.light <- findChromPeaks(m.light.global, noise.light, sn, rtgap=0.2)
   n.light <- dim(peaks.light)[[1]]
 
   m.heavy <- cbind(rt,heavy.int)
   dimnames(m.heavy)[[2]] <- c("rt","intensity")
-  m.heavy <- m.heavy[rt>=rt.range[1]&rt<=rt.range[2],]
-  noise.heavy <- estimateChromPeakNoise(m.heavy[,"intensity"])
-  peaks.heavy <- findChromPeaks(m.heavy,sn,rtgap=0.5)
+  m.heavy.global <- m.heavy[rt>=rt.range[1]&rt<=rt.range[2],]
+  noise.heavy.global <- estimateChromPeakNoise(m.heavy.global[,"intensity"])
+  m.heavy.local <- m.heavy[rt>=local.rt.range[1]&rt<=local.rt.range[2],]
+  noise.heavy.local <- estimateChromPeakNoise(m.heavy.local[,"intensity"])
+  noise.heavy <- min( noise.heavy.global, noise.heavy.local )
+  peaks.heavy <- findChromPeaks(m.heavy.global,noise.heavy,sn,rtgap=0.2)
   n.heavy <- dim(peaks.heavy)[[1]]
 
   pair.range <- c(noise.light, noise.heavy)
@@ -136,37 +142,6 @@ findPairChromPeaks <- function(rt, light.int, heavy.int, rt.range, sn=5) {
   }
   return(pair.range)
 }
-
-#findPairChromPeaks <- function(rt, light.int, heavy.int, rt.range) {
-#  m.light <- cbind(rt,light.int)
-#  dimnames(m.light)[[2]] <- c("mz","intensity")
-#  m.light <- m.light[rt>=rt.range[1]&rt<=rt.range[2],]
-#  noise.light <- specNoise(m.light)
-#  peaks.light <- specPeaks(m.light,sn=10,mzgap=0.5)
-#  n.light <- dim(peaks.light)[[1]]
-
-#  m.heavy <- cbind(rt,heavy.int)
-#  dimnames(m.heavy)[[2]] <- c("mz","intensity")
-#  m.heavy <- m.heavy[rt>=rt.range[1]&rt<=rt.range[2],]
-#  noise.heavy <- specNoise(m.heavy)
-#  peaks.heavy <- specPeaks(m.heavy,sn=10,mzgap=0.5)
-#  n.heavy <- dim(peaks.heavy)[[1]]
-
-#  pair.range <- integer(0)
-#  if ( n.heavy == 0 | n.light == 0 ) return(pair.range)
-
-#  for (i in 1:n.light) {
-#    rt.i <- peaks.light[i,"mz"]
-#    d.rt <- abs(rt.i-peaks.heavy[,"mz"])
-#    j <- which.min(d.rt)
-#    if (d.rt[j]>0.5) next
-#    rt.j <- peaks.heavy[j,"mz"]
-#    low <- min(rt.i-1.2*peaks.light[i,"fwhm"],rt.j-1.2*peaks.heavy[j,"fwhm"])
-#    high <- max(rt.i+1.2*peaks.light[i,"fwhm"],rt.j+1.2*peaks.heavy[j,"fwhm"])
-#    pair.range <- c(pair.range,low,high)
-#  }
-#  return(pair.range)
-#}
 
 readFileFromMsn <- function( xcms.raw ) {
   filename <- xcms.raw@filepath
