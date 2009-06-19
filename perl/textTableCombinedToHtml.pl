@@ -56,15 +56,19 @@ for ($i=1; $i<$nrow; ++$i) {
     if ($line[0] =~ /\d+/ ) {
 	$bold1="<b>";
 	$bold2="</b>";
+	$anchor1 = 1;
     } else {
 	$bold1="";
 	$bold2="";
+	$anchor1 = 0;
     }
     for ($j=0; $j<$ncol; ++$j) {
 	$_ = $line[$j];
 	if ( /^=HYPERLINK/ ) {
 	    /^=HYPERLINK\("(.*)","(\d+.\d+)"\)$/;
 	    print OUTFILE "<TD><A HREF=\"$1\">$2</A>";
+	} elsif ( /^([a-zA-Z]+)$/ && $anchor1 ) {
+	    print OUTFILE "<TD align=\"center\" $bgcolormap[$j]> <A NAME=\"$1\"></A> $bold1 $1 $bold2";
 	} else {
 	    print OUTFILE "<TD align=\"center\" $bgcolormap[$j]> $bold1 $line[$j] $bold2";
 	}
