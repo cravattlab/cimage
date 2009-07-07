@@ -1,4 +1,6 @@
-input.file <- "bash.input.file"
+args <- commandArgs(trailingOnly=T)
+
+input.file <- args[1]
 
 library(xcms)
 source("~/svnrepos/R/msisotope.R")
@@ -44,7 +46,11 @@ dimnames(yfile)[[1]] <- as.character( xfile@msnAcquisitionNum)
 tfile <- read.table( paste(filename,"scanNum_parentMz",sep="."), header=T)
 yfile[,"pmz"] <- tfile[,"parentMz"][match(yfile[,"num"],tfile[,"scanNum"])]
 
-xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=2.0, minptsperpeak=2)
+if ( length(args) >1 & args[2] == "fast" ) {
+  xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=10.0, minptsperpeak=5)
+} else {
+  xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=2.0, minptsperpeak=2)
+}
                                         # sort the matrix by retention time first
 xpeaks.save <- xpeaks
 xpeaks <- xpeaks[order(xpeaks[,"rt"]), ]
@@ -65,7 +71,6 @@ pair.list <- data.frame(idx1=numeric(0),idx2=numeric(0),charge=numeric(0),
 
 rt.list <- levels(factor(xpeaks[,"rt"]))
 cat( paste("detect isotopic peak pairs in", length(rt.list), "rt windows in total\n") )
-cat( "Finished " )
 for ( rt.i in 1:length(rt.list) ) {
   cat(".")
   if (rt.i%%100 == 0) cat(rt.i)
@@ -186,7 +191,7 @@ for ( rt.i in 1:length(rt.list) ) {
     #pair.list <- rbind( pair.list, pair.list.this.charge )
   }
 }
-cat("\n")
+cat( "Finished\n" )
 
 if( dim(pair.list)[1] == 0 ) {
   print("no doublet peaks identified")
@@ -417,7 +422,11 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
 
 ## table with peak.count
 rownames(out.table) <- out.table$peaks.id
+if (nrow(out.table)==0) {
+  quit()
+}
 out.table <- out.table[ order(out.table$peaks.count, decreasing=TRUE), ]
+
 out.filename <- paste(output.path, output.file.base, ".table.txt", sep="")
 write.table( format(out.table,digits=10), out.filename, quote=FALSE, row.names=FALSE)
 

@@ -3,16 +3,10 @@
 # a wrapper script to run findIsoMs1Centroid.R each individual mzXML file to avoid overflowing memory
 
 if [ $# -lt 1 ]; then
-    echo Usage: $0 input_mzXML_file
+    echo Usage: $0 input_mzXML_file [fast]
     exit -1;
 fi
 
-for p in $@
-  do
-  echo $p
-  cat ~/svnrepos/R/findIsoMs1Centroid.R | sed "s/bash\.input\.file/$p/g" > tmp.R
-  R CMD BATCH --vanilla tmp.R
-  mv tmp.Rout $p.Rout
-done
+R --vanilla --args $@ < /home/chuwang/svnrepos/R/findIsoMs1Centroid.R > $1.Rout
 
 exit 0
