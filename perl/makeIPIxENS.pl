@@ -5,7 +5,7 @@ if ($ARGV[0] eq "") {
     die "\tusage:  makeIPIxENS input_uniprot.dat\n\n";
 }
 
-#$whatever 3
+#$whatever 6
 open (UNI, $ARGV[0]) or die "cannot open $ARGV[0]";
 @uni = <UNI>;
 close UNI;
