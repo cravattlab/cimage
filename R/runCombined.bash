@@ -17,9 +17,10 @@ do
 done
 dirs=$(echo $allpt | sed "s/$txt//g")
 
-R --vanilla --args $txt $dirs < /home/chuwang/svnrepos/R/combined.R > combined.Rout
+R --vanilla --args $txt $dirs < /home/chuwang/svnrepos/R/combined.R > $outname.Rout
 
 mv combined.txt $outname.txt
+mv combined.png $outname.png
 
-/home/chuwang/svnrepos/perl/textTableCombinedToHtml.pl $outname.txt
+/home/chuwang/svnrepos/perl/textTableCombinedToHtml.pl $outname.txt $outname.png $allpt
 
