@@ -90,6 +90,7 @@ for ( i in 1:dim(cross.table)[1] ) {
   description <- as.character(ipi.name.table[ipi,"name"])
   symbol<- strsplit(description, " ")[[1]][1]
   peptide.vec <- unlist( strsplit(peptide,"",fixed=T) )
+  nmod <- length(which(peptide.vec=="*"))
   modified.mass <- sum( probe.mass[peptide.vec[which(peptide.vec=="*")-1]] )
   mono.mass  <- cross.table[i,"mass"]+modified.mass
   mass <- mono.mass + (which.max(isotope.dist( averagine.count(mono.mass) )) - 1)*isotope.mass.unit
@@ -97,7 +98,7 @@ for ( i in 1:dim(cross.table)[1] ) {
 
   ## mz
   mz.light <- mass/charge + Hplus.mass
-  mz.heavy <- (mass+pair.mass.delta)/charge + Hplus.mass
+  mz.heavy <- (mass+nmod*pair.mass.delta)/charge + Hplus.mass
   ## scan number
   ms1.scan.rt <- ms1.scan.num <- exist.index <- which( raw.scan.num > 0 )
   for ( k in 1:length(exist.index) ) {
