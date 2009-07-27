@@ -35,6 +35,7 @@ cross.vec <- as.character(args)
 ncross <- length(cross.vec)
 
 ## find all matched input files in current directory
+##if(FALSE) {
 input.path <- getwd()
 mzXML.names <- list.files(path="../",pattern="mzXML$")
 mzXML.files <- as.list( mzXML.names )
@@ -43,7 +44,7 @@ for (name in mzXML.names) {
   cat(paste(name,"\n",sep=""))
   mzXML.files[[name]] <- xcmsRaw( paste("../",name,sep=""), profstep=0, includeMSn=T)
 }
-
+##}
 ##special case for raw file corruption
 ##ex2 <- mzXML.files[[2]]
 ##new.ex2 <- readFileFromMsn( ex2 )
@@ -51,7 +52,7 @@ for (name in mzXML.names) {
 ##
 
 ## retention time window in secs
-rt.window <- 5
+rt.window <- 10
 rt.window.width <- rt.window * 60
 local.rt.window <- 2
 local.rt.window.width <- local.rt.window * 60
@@ -71,10 +72,13 @@ colnames(out.df) <- column.names
 out.filename.base <- paste("output_rt_",as.character(rt.window),"_sn_",
                       as.character(sn),sep="")
 out.filename <- paste(output.path,"/",out.filename.base,".ps",sep="")
-
-postscript( out.filename, horizontal=F)
-layout.vec <- seq(1,ncross)
-layout.matrix <- cbind(2*layout.vec-1, 2*layout.vec-1, 2*layout.vec)
+out.filename.r2 <- paste(output.path,"/",out.filename.base,".ps",sep="")
+postscript( out.filename, horizontal=T)
+layout.vec <- c(1,1,2)
+for (i in 1:(ncross-1)) {
+  layout.vec <- c(layout.vec,(layout.vec+i*2))
+}
+layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
@@ -93,10 +97,12 @@ for ( i in 1:dim(cross.table)[1] ) {
   nmod <- length(which(peptide.vec=="*"))
   modified.mass <- sum( probe.mass[peptide.vec[which(peptide.vec=="*")-1]] )
   mono.mass  <- cross.table[i,"mass"]+modified.mass
-  mass <- mono.mass + (which.max(isotope.dist( averagine.count(mono.mass) )) - 1)*isotope.mass.unit
+  predicted.dist <- isotope.dist( averagine.count(mono.mass) )
+  mass <- mono.mass + (which.max(predicted.dist) - 1)*isotope.mass.unit
   raw.scan.num <- cross.table[i,cross.vec]
 
   ## mz
+  mono.mz <- mono.mass/charge + Hplus.mass
   mz.light <- mass/charge + Hplus.mass
   mz.heavy <- (mass+nmod*pair.mass.delta)/charge + Hplus.mass
   ## scan number
@@ -189,8 +195,8 @@ for ( i in 1:dim(cross.table)[1] ) {
     peaks <- peaks[-c(1,2)]
     n.peaks <- length(peaks)/2
 
-    best.r2 <- best.npoints <- best.ratio <- 0.0
-    best.xlm <- best.light.yes <- best.heavy.yes <- best.low <- best.high <- NULL
+    best.mono.check <- best.r2 <- best.npoints <- best.ratio <- 0.0
+    best.xlm <- best.light.yes <- best.heavy.yes <- best.low <- best.high <- c(0)
     best.fixed <- F
     if (n.peaks>0) {
       for (n in 1:n.peaks) {
@@ -199,19 +205,24 @@ for ( i in 1:dim(cross.table)[1] ) {
         yes <- which( raw.ECI.light.rt>=low & raw.ECI.light.rt<=high )
         light.yes <- raw.ECI.light[[2]][yes]
         heavy.yes <- raw.ECI.heavy[[2]][yes]
+
+        peak.scan.num <- raw.ECI.light[[1]][yes][which.max(light.yes)]
+        peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.mass-2)/charge, mz.heavy) )
+        mono.check <- checkChargeAndMonoMass( peak.scan, mono.mass, charge, mz.ppm.cut, predicted.dist)
         ## calculate ratio of integrated peak area
         ratio <- round(sum(light.yes)/sum(heavy.yes),digits=2)
-        if (ratio > 15 | ratio <0.4) next
         lines(c(low,low),ylimit/10, col="green")
         lines(c(high,high),ylimit/10, col="green")
         text(mean(c(low,high)),max(light.yes,heavy.yes)*1.2,
-             labels=format(ratio,digits=4))
+             labels=paste(round(ratio,2),round(mono.check,2),sep="/"))
         ## calculate peak co-elution profile using only points above noise line
         ##yes2 <- light.yes > noise.light & heavy.yes > noise.heavy
         ##light.yes <- light.yes[yes2]
         ##heavy.yes <- heavy.yes[yes2]
+        if (ratio > 15 | ratio <0.4) next
+        if (mono.check < 0.80) next
         npoints <- length(light.yes)
-        if (npoints<5) {
+        if (npoints<3) {
           next
         }
         x.lm <- lsfit( x=heavy.yes, y=light.yes,intercept=F )
@@ -219,7 +230,9 @@ for ( i in 1:dim(cross.table)[1] ) {
         if ( !is.na(tag.rt) & tag.rt>=low & tag.rt<=high) {
           best.fixed <- T
         }
-        if ( best.fixed | npoints > best.npoints ) {
+        if ( best.fixed | (best.mono.check < 0.95 & mono.check >= best.mono.check) |
+            ( best.mono.check >=0.95 & mono.check >=0.95 & max(light.yes)>max(best.light.yes) ) ) {
+          best.mono.check <- mono.check
           best.npoints <- npoints
           best.r2 <- r2
           best.ratio <- ratio
@@ -247,6 +260,7 @@ for ( i in 1:dim(cross.table)[1] ) {
       l.ratios[j] <- best.xlm
       r2.v[j] <- best.r2
     } else {
+      ##plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
       plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
     }
   }
@@ -254,7 +268,7 @@ for ( i in 1:dim(cross.table)[1] ) {
               " - M/Z: ", as.character(format(mz.light, digits=7)),
               "and", as.character(format(mz.heavy,digits=7)))
   mtext(tt, line=3.5, outer=T)
-  mtext(paste(cross.table[i,"peptide"],"; Mono.mass: ", as.character(mono.mass), sep=""),
+  mtext(paste(cross.table[i,"peptide"],"; Mono.mass: ", as.character(mono.mass), "; Mono.mz: ", as.character(round(mono.mz,5)),sep=""),
         cex=0.8, line=2, out=T)
   mtext(paste(cross.table[i,"ipi"],description),line=0.8, cex=0.8,out=T)
   ## save data in outdf
