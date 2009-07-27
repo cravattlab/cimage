@@ -170,3 +170,37 @@ readFileFromMsn <- function( xcms.raw ) {
   }
   return( xcms.raw )
 }
+
+checkChargeAndMonoMass <- function(peak.scan, mono.mass, charge, mz.ppm.cut, predicted.dist) {
+  cc <- 0.0
+  isotope.mass.unit <- 1.0033548
+  Hplus.mass <- 1.0072765
+  isomer.max <- which.max(predicted.dist)
+  isomer.v <- seq(1, (isomer.max+2) )
+  isomer.fit <- predicted.dist[ isomer.v ] / predicted.dist[isomer.max]
+  isomer.v <- c(0, isomer.v)
+  isomer.fit <- c(0, isomer.fit)
+  isomer.mz <- (mono.mass + (isomer.v-1)*isotope.mass.unit)/charge+Hplus.mass
+  raw.dist <- isomer.fit
+  for ( i in 1:length(raw.dist) ) {
+    this.mz <- isomer.mz[i]
+    mz.diff <- abs(peak.scan[,1]-this.mz)/this.mz
+    if (min(mz.diff) <= mz.ppm.cut ) {
+      raw.dist[i] <- peak.scan[which.min(mz.diff),2]
+    } else {
+      raw.dist[i] <- cc
+    }
+  }
+  if ( max(raw.dist) > 0.0 ) {
+    raw.dist <- raw.dist / max(raw.dist)
+  } else {
+    ## no signal found at all
+    return(cc)
+  }
+  ## a strong peak left to the monoisotopic peak
+  if (raw.dist[1] > 0.5) return(cc)
+
+  cc <- cor(isomer.fit,raw.dist)
+  return(cc)
+}
+
