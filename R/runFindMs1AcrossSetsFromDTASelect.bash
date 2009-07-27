@@ -93,7 +93,7 @@ mkdir -p output/PNG
 cd output
 for p in $(\ls *.ps | sed 's/\.ps//g')
 do
-    convert $p.ps $p.png
+    convert -rotate 90 $p.ps $p.png
     mv $p*.png ./PNG/
     ps2pdf $p.ps
 done
