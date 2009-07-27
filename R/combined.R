@@ -10,7 +10,7 @@ uniq.tryptic.sequence <- function( raw.sequence ) {
     start <- first.label - 1
     while(seq.vec[start] != ".") {
       start <- start - 1
-      if ( (seq.vec[start] == "R" | seq.vec[start] == "K") & seq.vec[start+1] != 'P' ) {
+      if ( (seq.vec[start] == "R" | seq.vec[start] == "K") ) { ##& seq.vec[start+1] != 'P' ) {
         break
       }
     }
@@ -18,12 +18,19 @@ uniq.tryptic.sequence <- function( raw.sequence ) {
     end <- last.label+1
     while( seq.vec[end] != "." ) {
       end <- end + 1
-      if ( (seq.vec[end-1] == "R" | seq.vec[end-1] == "K") & seq.vec[end] != 'P' ) {
+      if ( (seq.vec[end-1] == "R" | seq.vec[end-1] == "K") ) { ##& seq.vec[end] != 'P' ) {
         break
       }
     }
     uniq.seq.vec <- seq.vec[(start+1):(end-1)]
-    return( paste( uniq.seq.vec[uniq.seq.vec != "*"],sep="",collapse="") )
+    if (length(uniq.seq.vec) == 3 ) { ## only two residues long, return the whole sequence
+      return( strsplit(raw.sequence,".",fixed=T)[[1]][2] )
+    }
+    if ( length(label.pos) == 1 ) {
+      return( paste( uniq.seq.vec[uniq.seq.vec != "*"],sep="",collapse="") )
+    } else {
+      return( paste( uniq.seq.vec,sep="",collapse="") )
+    }
   }
 }
 
