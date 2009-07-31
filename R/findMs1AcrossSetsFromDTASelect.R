@@ -73,10 +73,14 @@ out.filename.base <- paste("output_rt_",as.character(rt.window),"_sn_",
                       as.character(sn),sep="")
 out.filename <- paste(output.path,"/",out.filename.base,".ps",sep="")
 out.filename.r2 <- paste(output.path,"/",out.filename.base,".ps",sep="")
-postscript( out.filename, horizontal=T)
-layout.vec <- c(1,1,2)
+horiz.layout <- F
+if (ncross < 3) {
+  horiz.layout <- T
+}
+postscript( out.filename, horizontal=horiz.layout)
+layout.vec <- row.layout.vec <- c(1,1,2)
 for (i in 1:(ncross-1)) {
-  layout.vec <- c(layout.vec,(layout.vec+i*2))
+  layout.vec <- c(layout.vec,(row.layout.vec+i*2))
 }
 layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
