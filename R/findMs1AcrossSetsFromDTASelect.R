@@ -61,7 +61,7 @@ sn <- 2.5
 
 ## column names for calculated ratios
 integrated.area.ratio <- paste("IR",cross.vec,sep=".")
-linear.regression.ratio <- paste("LR",cross.vec,sep=".")
+linear.regression.ratio <- paste("NP",cross.vec,sep=".")
 linear.regression.R2 <- paste("R2",cross.vec,sep=".")
 column.names <- c("index","ipi", "description", "symbol", "sequence", "mass", "charge", "segment",
                   integrated.area.ratio, linear.regression.ratio, linear.regression.R2, "entry", "link" )
@@ -86,6 +86,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
+##for ( i in 836:836) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -173,13 +174,18 @@ for ( i in 1:dim(cross.table)[1] ) {
     plot(raw.ECI.light.rt, raw.ECI.light[[2]], type="l", col="red",xlab="Retention Time(min)",
          ylab="intensity", main=tt.main, xlim=xlimit,ylim=ylimit)
     lines(raw.ECI.heavy.rt, raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
+    k.ms1.rt.v <- numeric(0)
     if ( !is.na(tag.rt) ) {
       all.ms2.scan <- as.integer( all.scan.table[(key==all.scan.table[,"key"]
                                                   &cross.vec[j]==all.scan.table[,"run"]),"scan"] )
       for (k in 1:length(all.ms2.scan)) {
         k.ms1.scan <- which(xfile@acquisitionNum > all.ms2.scan[k])[1]-1
+        if (is.na(k.ms1.scan)) {
+          k.ms1.scan <- length(xfile@acquisitionNum)
+        }
         k.ms1.rt <- xfile@scantime[k.ms1.scan]/60
         points(k.ms1.rt, raw.ECI.light[[2]][k.ms1.scan], type='p',cex=0.5, pch=1)
+        k.ms1.rt.v <- c(k.ms1.rt.v,k.ms1.rt)
       }
       ##lines(c(tag.rt,tag.rt),c(0.0, max(raw.ECI.light[[2]],raw.ECI.heavy[[2]])), col="green")
       points(tag.rt, raw.ECI.light[[2]][tag.ms1.scan.num], type='p',pch=8)
@@ -202,6 +208,7 @@ for ( i in 1:dim(cross.table)[1] ) {
     best.mono.check <- best.r2 <- best.npoints <- best.ratio <- 0.0
     best.xlm <- best.light.yes <- best.heavy.yes <- best.low <- best.high <- c(0)
     best.fixed <- F
+    n.candidate.peaks <- n.ms2.peaks <- 0
     if (n.peaks>0) {
       for (n in 1:n.peaks) {
         low <- peaks[2*n-1]
@@ -229,8 +236,15 @@ for ( i in 1:dim(cross.table)[1] ) {
         if (npoints<3) {
           next
         }
+        ## extra information for better filtering
+        if (length(k.ms1.rt.v>0) & (sum((k.ms1.rt.v>=low & k.ms1.rt.v<=high))>0)) {
+          n.ms2.peaks <- n.ms2.peaks + 1
+        }
         x.lm <- lsfit( x=heavy.yes, y=light.yes,intercept=F )
         r2 <- round(as.numeric(ls.print(x.lm,print.it=F)$summary[1,2]),digits=2)
+        if (r2>0.8) {
+          n.candidate.peaks <- n.candidate.peaks + 1
+        }
         if ( !is.na(tag.rt) & tag.rt>=low & tag.rt<=high) {
           best.fixed <- T
         }
@@ -261,12 +275,13 @@ for ( i in 1:dim(cross.table)[1] ) {
       abline(0,best.xlm)
       abline(0,1,col="grey")
       i.ratios[j] <- best.ratio
-      l.ratios[j] <- best.xlm
+      ##l.ratios[j] <- best.xlm
       r2.v[j] <- best.r2
     } else {
       ##plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
       plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
     }
+    l.ratios[j] <- paste(n.ms2.peaks, n.candidate.peaks, sep="/")
   }
   tt <- paste("Entry ", as.character(i), "-  Charge: ", as.character(charge),
               " - M/Z: ", as.character(format(mz.light, digits=7)),
