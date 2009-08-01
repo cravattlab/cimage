@@ -49,8 +49,8 @@ tmp.names <- names(tmp.table)
 v1 <- which(substr(tmp.names,1,3) == "IR.")
 nset <- length(v1)
 vn1 <- paste("IR.set_",seq(1,nset),sep="")
-v2 <- which(substr(tmp.names,1,3) == "LR.")
-vn2 <- paste("LR.set_",seq(1,nset),sep="")
+v2 <- which(substr(tmp.names,1,3) == "NP.")
+vn2 <- paste("NP.set_",seq(1,nset),sep="")
 v3 <- which(substr(tmp.names,1,3) == "R2.")
 vn3 <- paste("R2.set_",seq(1,nset),sep="")
 
@@ -78,14 +78,14 @@ for( i in 1:length(vn1) ) {
 }
 ## only consider entries with at least two valid ratios out of three concentrations
 for( i in 1:nrow(all.table) ) {
-  all.table[i,"filter"] <- sum(all.table[i,vn1]>0, na.rm=T)
+  all.table[i,"filter"] <- sum(all.table[i,vn1[nset]]>0, na.rm=T)
 }
 
 sp=" "
 count <- 0
 link.list <- as.list( levels(as.factor(all.table$uniq) ) )
 nuniq <- length(link.list)
-out.num.matrix <- matrix(0,nrow=nuniq,ncol=2*nset)
+out.num.matrix <- matrix(0 ,nrow=nuniq,ncol=2*nset)
 colnames(out.num.matrix) <- c( paste("mr.set_",seq(1,nset),sep=""), paste("sd.set_",seq(1,nset),sep=""))
 char.names <- c("index","ipi", "description", "symbol", "sequence", "mass", "run", "charge", "segment", "link")
 out.char.matrix <- matrix(" ",nrow=nuniq,ncol=length(char.names))
@@ -105,7 +105,7 @@ for (uniq in levels(as.factor(all.table$uniq) ) ) {
   count <- count+1
   link.list[[count]] <- which(match)[ii]
 
-  pass <- sub.table$filter>=2
+  pass <- sub.table$filter>=1
   out.char.matrix[count,"index"] <- as.character(count)
   out.char.matrix[count,"sequence"] <- as.character(uniq)
   out.char.matrix[count,"run"] <- paste(levels(as.factor(sub.table[,"run"])),sep="",collapse="")
@@ -153,7 +153,8 @@ for ( m in 1:length(z.order)) {
     new.char.matrix <- rbind(new.char.matrix,this.c.entry)
     for ( n in 1:nset ) {
       this.n.entry[n] <- sub.table[l,vn1[n]]
-      this.n.entry[n+nset] <- NA
+      this.n.entry[n+nset] <- as.character(sub.table[l,vn2[n]])
+      ##this.n.entry[n+nset] <- NA
     }
     new.num.matrix <- rbind(new.num.matrix,this.n.entry)
   }
