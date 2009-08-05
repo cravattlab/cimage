@@ -177,6 +177,10 @@ for ( i in 1:nset) {
 }
 ratio <- ratio[valid,seq(1,nset)]
 
+if ( is.vector(ratio) ) {
+  ratio <- matrix( ratio, byrow=T,ncol=1 )
+  colnames(ratio) <- colnames(out.num.matrix)[1]
+}
 x<- seq(nrow(ratio),1)
 yl <- c(0, max(ratio))
 for ( i in 1:nset) {
