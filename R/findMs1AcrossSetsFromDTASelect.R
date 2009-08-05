@@ -78,15 +78,17 @@ if (ncross < 3) {
   horiz.layout <- T
 }
 postscript( out.filename, horizontal=horiz.layout)
-layout.vec <- row.layout.vec <- c(1,1,2)
-for (i in 1:(ncross-1)) {
-  layout.vec <- c(layout.vec,(row.layout.vec+i*2))
+layout.vec <- row.layout.vec <- c(1,1,2,1,1,3)
+if ( ncross > 1 ) {
+  for (i in 1:(ncross-1)) {
+    layout.vec <- c(layout.vec,(row.layout.vec+i*3))
+  }
 }
 layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-##for ( i in 836:836) {
+##for ( i in 1:1) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -205,7 +207,7 @@ for ( i in 1:dim(cross.table)[1] ) {
     peaks <- peaks[-c(1,2)]
     n.peaks <- length(peaks)/2
 
-    best.mono.check <- best.r2 <- best.npoints <- best.ratio <- 0.0
+    best.peak.scan.num <- best.mono.check <- best.r2 <- best.npoints <- best.ratio <- 0.0
     best.xlm <- best.light.yes <- best.heavy.yes <- best.low <- best.high <- c(0)
     best.fixed <- F
     n.candidate.peaks <- n.ms2.peaks <- 0
@@ -259,6 +261,7 @@ for ( i in 1:dim(cross.table)[1] ) {
           best.high <- high
           best.light.yes <- light.yes
           best.heavy.yes <- heavy.yes
+          best.peak.scan.num <- peak.scan.num
         }
         if (best.fixed) break
       }
@@ -277,12 +280,55 @@ for ( i in 1:dim(cross.table)[1] ) {
       i.ratios[j] <- best.ratio
       ##l.ratios[j] <- best.xlm
       r2.v[j] <- best.r2
+      ## plot raw spectrum
+      predicted.dist <- predicted.dist[1:20]
+      predicted.dist.merge <- best.ratio*c(predicted.dist, rep(0,mass.shift)) + c(rep(0,mass.shift),predicted.dist)
+      n.max <- which.max(predicted.dist.merge)
+      predicted.dist.merge <- predicted.dist.merge/predicted.dist.merge[n.max]
+      mz.unit <- isotope.mass.unit/charge
+      predicted.mz <- mono.mz + mz.unit*(seq(1,length(predicted.dist.merge))-1)
+      mz.max <- predicted.mz[n.max]
+      mass.range <- c(mono.mz-2*mz.unit, mz.heavy+8*mz.unit)
+      scan.data <- getScan(xfile, best.peak.scan.num, massrange=mass.range)
+      scan.mz <- scan.data[,"mz"]
+      scan.int <- scan.data[,"intensity"]
+      observed.int <- predicted.mz
+      for ( k in 1:length(observed.int) ) {
+        this.mz <- predicted.mz[k]
+        mz.diff <- abs(scan.mz-this.mz)/this.mz
+        if (min(mz.diff) <= mz.ppm.cut ) {
+          observed.int[k] <- scan.int[which.min(mz.diff)]
+        } else {
+          observed.int[k] <- 0.0
+        }
+      }
+      int.max <- observed.int[n.max]
+      if ( max(int.max) > 0.0 ) {
+        observed.int <- observed.int / int.max
+        scan.int <- scan.int / int.max
+      } else {
+        scan.int <- scan.int/max(scan.int)
+      }
+      ylimit <- c(0,1.1)
+      plot(scan.mz, scan.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit, col="gray")
+      par(new=T)
+      plot(predicted.mz, observed.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit, col="black")
+      par(new=T)
+      plot( predicted.mz, predicted.dist.merge, type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
+      light.n <- seq(1,(mass.shift))
+      points(predicted.mz[light.n],rep(0,length(light.n)), pch=23,col="red",bg="red")
+      heavy.n <- seq((mass.shift+1),2*mass.shift)
+      points(predicted.mz[heavy.n],rep(0,length(heavy.n)), pch=24,col="blue",bg="blue")
+      title( paste("Scan # ", xfile@acquisitionNum[best.peak.scan.num], " @ ",
+                   round(xfile@scantime[best.peak.scan.num]/60,1)," min; NL:",
+                   formatC(int.max, digits=2,format="e"), sep = ""))
     } else {
       ##plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
       plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+      plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
     }
     l.ratios[j] <- paste(n.ms2.peaks, n.candidate.peaks, sep="/")
-  }
+  } ## each ratio j
   tt <- paste("Entry ", as.character(i), "-  Charge: ", as.character(charge),
               " - M/Z: ", as.character(format(mz.light, digits=7)),
               "and", as.character(format(mz.heavy,digits=7)))
@@ -296,7 +342,7 @@ for ( i in 1:dim(cross.table)[1] ) {
                paste('=HYPERLINK(\"./PNG/', out.filename.base,'-', as.character(i-1),'.png\")',sep=''))
   names(this.df) <- column.names
   out.df <- rbind(out.df, this.df)
-} ## each entry
+} ## each entry i
 dev.off()
 
 all.table <- out.df
@@ -323,4 +369,5 @@ all.table.out <- rbind(all.table.out, all.table)
 ## output the final table
 row.names(all.table.out) <- as.character(seq(1:dim(all.table.out)[1]) )
 all.table.out[,"index"] <- seq(1:dim(all.table.out)[1])
-write.table(all.table.out,file=paste(output.path,"/",out.filename.base,".to_excel.txt",sep=""), quote=F, sep="\t", row.names=F,na="0.00")
+write.table(all.table.out,file=paste(output.path,"/",out.filename.base,".to_excel.txt",sep=""),
+            quote=F, sep="\t", row.names=F,na="0.00")
