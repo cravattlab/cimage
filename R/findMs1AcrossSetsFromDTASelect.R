@@ -35,7 +35,7 @@ cross.vec <- as.character(args)
 ncross <- length(cross.vec)
 
 ## find all matched input files in current directory
-##if(FALSE) {
+if(FALSE) {
 input.path <- getwd()
 mzXML.names <- list.files(path="../",pattern="mzXML$")
 mzXML.files <- as.list( mzXML.names )
@@ -44,7 +44,7 @@ for (name in mzXML.names) {
   cat(paste(name,"\n",sep=""))
   mzXML.files[[name]] <- xcmsRaw( paste("../",name,sep=""), profstep=0, includeMSn=T)
 }
-##}
+}
 ##special case for raw file corruption
 ##ex2 <- mzXML.files[[2]]
 ##new.ex2 <- readFileFromMsn( ex2 )
@@ -63,8 +63,9 @@ sn <- 2.5
 integrated.area.ratio <- paste("IR",cross.vec,sep=".")
 linear.regression.ratio <- paste("NP",cross.vec,sep=".")
 linear.regression.R2 <- paste("R2",cross.vec,sep=".")
+light.integrated.area <- paste("INT",cross.vec,sep=".")
 column.names <- c("index","ipi", "description", "symbol", "sequence", "mass", "charge", "segment",
-                  integrated.area.ratio, linear.regression.ratio, linear.regression.R2, "entry", "link" )
+                  integrated.area.ratio, light.integrated.area, linear.regression.ratio, linear.regression.R2, "entry", "link" )
 out.df <- matrix(nrow=0, ncol=length(column.names))
 colnames(out.df) <- column.names
 
@@ -125,7 +126,7 @@ for ( i in 1:dim(cross.table)[1] ) {
     ms1.scan.rt[k] <- xfile@scantime[ms1.scan.num[k]]
   }
 
-  r2.v <- l.ratios <- i.ratios <- rep(NA,ncross)
+  r2.v <- l.ratios <- light.int.v <- i.ratios <- rep(NA,ncross)
   for ( j in 1:ncross ) {
     raw.file <- paste( cross.vec[j], "_", segment,".mzXML",sep="")
     xfile <- mzXML.files[[raw.file]]
@@ -207,7 +208,7 @@ for ( i in 1:dim(cross.table)[1] ) {
     peaks <- peaks[-c(1,2)]
     n.peaks <- length(peaks)/2
 
-    best.peak.scan.num <- best.mono.check <- best.r2 <- best.npoints <- best.ratio <- 0.0
+    best.peak.scan.num <- best.mono.check <- best.r2 <- best.npoints <- best.light.int <- best.ratio <- 0.0
     best.xlm <- best.light.yes <- best.heavy.yes <- best.low <- best.high <- c(0)
     best.fixed <- F
     n.candidate.peaks <- n.ms2.peaks <- 0
@@ -256,6 +257,7 @@ for ( i in 1:dim(cross.table)[1] ) {
           best.npoints <- npoints
           best.r2 <- r2
           best.ratio <- ratio
+          best.light.int <- sum(light.yes)
           best.xlm <- round(as.numeric(ls.print(x.lm,print.it=F)$coef.table[[1]][,"Estimate"]),digits=2)
           best.low <- low
           best.high <- high
@@ -278,6 +280,7 @@ for ( i in 1:dim(cross.table)[1] ) {
       abline(0,best.xlm)
       abline(0,1,col="grey")
       i.ratios[j] <- best.ratio
+      light.int.v[j] <- best.light.int
       ##l.ratios[j] <- best.xlm
       r2.v[j] <- best.r2
       ## plot raw spectrum
@@ -338,7 +341,7 @@ for ( i in 1:dim(cross.table)[1] ) {
   mtext(paste(cross.table[i,"ipi"],description),line=0.8, cex=0.8,out=T)
   ## save data in outdf
   this.df <- c(i, ipi, description, symbol, peptide, round(mass,digits=4), charge, segment,
-               i.ratios, l.ratios, r2.v, entry.index,
+               i.ratios, light.int.v, l.ratios, r2.v, entry.index,
                paste('=HYPERLINK(\"./PNG/', out.filename.base,'-', as.character(i-1),'.png\")',sep=''))
   names(this.df) <- column.names
   out.df <- rbind(out.df, this.df)
