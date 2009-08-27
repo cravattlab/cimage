@@ -35,7 +35,7 @@ cross.vec <- as.character(args)
 ncross <- length(cross.vec)
 
 ## find all matched input files in current directory
-if(FALSE) {
+##if(FALSE) {
 input.path <- getwd()
 mzXML.names <- list.files(path="../",pattern="mzXML$")
 mzXML.files <- as.list( mzXML.names )
@@ -44,7 +44,7 @@ for (name in mzXML.names) {
   cat(paste(name,"\n",sep=""))
   mzXML.files[[name]] <- xcmsRaw( paste("../",name,sep=""), profstep=0, includeMSn=T)
 }
-}
+##}
 ##special case for raw file corruption
 ##ex2 <- mzXML.files[[2]]
 ##new.ex2 <- readFileFromMsn( ex2 )
