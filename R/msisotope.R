@@ -191,15 +191,43 @@ checkChargeAndMonoMass <- function(peak.scan, mono.mass, charge, mz.ppm.cut, pre
       raw.dist[i] <- cc
     }
   }
-  if ( max(raw.dist) > 0.0 ) {
-    raw.dist <- raw.dist / max(raw.dist)
+  max.raw.dist <- max(raw.dist)
+  if ( max.raw.dist > 0.0 ) {
+    raw.dist <- raw.dist / max.raw.dist
   } else {
     ## no signal found at all
     return(cc)
   }
   ## a strong peak left to the monoisotopic peak
   if (raw.dist[1] > 0.5) return(cc)
-
+  ## only one point for correlation analysis
+  npts.expect <- sum(isomer.fit > 0.10)
+  if (sum(raw.dist>0) < npts.expect ) return(cc)
+  ## quick check on charge states -- take spectrum above 10% intensity cutoff and measure peak gap
+  ## not sufficient for overlapping peaks
+  i.mz <- which.max(raw.dist)
+  if (i.mz == length(raw.dist) ) return(cc)
+  mz.range <- c(isomer.mz[i.mz]*(1-mz.ppm.cut), isomer.mz[i.mz+1]*(1+mz.ppm.cut))
+  int.range <- max.raw.dist*c(raw.dist[i.mz+1], raw.dist[i.mz])
+  tmp1 <- peak.scan[,"intensity"]>=int.range[1] & peak.scan[,"mz"] >= mz.range[1] & peak.scan[,"mz"] <= mz.range[2]
+  peak.mz <- peak.scan[tmp1,"mz"]
+  n.extra.peak <- length(peak.mz)-2
+  wrong.charge <- FALSE
+  if (n.extra.peak > 0) {
+    for ( j in 1:n.extra.peak ) {
+      new.mz <- seq(mz.range[1],mz.range[2],length=j+2)
+      wrong.charge <- TRUE
+      for ( k in 1:length(new.mz) ) {
+        this.mz <- new.mz[k]
+        mz.diff <- abs(peak.mz-this.mz)/this.mz
+        if (sum(mz.diff<mz.ppm.cut) == 0) {
+          wrong.charge <- FALSE
+          break
+        }
+      }
+      if (wrong.charge) return(cc)
+    }
+  }
   cc <- cor(isomer.fit,raw.dist)
   return(cc)
 }
