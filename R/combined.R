@@ -53,12 +53,13 @@ v2 <- which(substr(tmp.names,1,3) == "NP.")
 vn2 <- paste("NP.set_",seq(1,nset),sep="")
 v3 <- which(substr(tmp.names,1,3) == "R2.")
 vn3 <- paste("R2.set_",seq(1,nset),sep="")
-
+v4 <- which(substr(tmp.names,1,4) == "INT.")
+vn4 <- paste("INT.set_",seq(1,nset),sep="")
 
 all.table <- NULL
 for (i in 1:length(dirs) ) {
   table[[i]] <- read.table(paste(dirs[i],input.file,sep=""),header=T,sep="\t",quote="")
-  names(table[[i]])[c(v1,v2,v3)] <- c(vn1,vn2,vn3)
+  names(table[[i]])[c(v1,v2,v3,v4)] <- c(vn1,vn2,vn3,vn4)
   table[[i]][,"sequence"] <- as.character( table[[i]][,"sequence"] )
   table[[i]]$run<-i
   table[[i]]$uniq <-i
