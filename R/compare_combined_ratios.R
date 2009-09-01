@@ -1,4 +1,3 @@
-source("/home/chuwang/svnrepos/R/chu.summary.R")
 args <- commandArgs(trailingOnly=T)
 if (length(args) < 6 ) {
   print("R --args table1 column1 name1 table2 column2 name2")
@@ -66,4 +65,5 @@ dev.off()
 
 out.table <- cbind(fit.conc, fit.time)
 colnames(out.table) <- c(name1, name2)
-write.table(out.table, file=paste(outname,"txt",sep="."), sep="\t",row.names=F)
+rownames(out.table) <- seq[common]
+write.table(out.table, file=paste(outname,"txt",sep="."), sep="\t",row.names=T)
