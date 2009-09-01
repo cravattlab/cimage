@@ -232,3 +232,102 @@ checkChargeAndMonoMass <- function(peak.scan, mono.mass, charge, mz.ppm.cut, pre
   return(cc)
 }
 
+multiTitle <- function(...){
+###
+### multi-coloured title
+###
+### examples:
+###  multiTitle(color="red","Traffic",
+###             color="orange"," light ",
+###             color="green","signal")
+###
+### - note triple backslashes needed for embedding quotes:
+###
+###  multiTitle(color="orange","Hello ",
+###             color="red"," \\\"world\\\"!")
+###
+### Barry Rowlingson <b.rowlingson@lancaster.ac.uk>
+###
+  l = list(...)
+  ic = names(l)=='color'
+  colors = unique(unlist(l[ic]))
+
+  for(i in colors){
+    color=par()$col.main
+    strings=c()
+    for(il in 1:length(l)){
+      p = l[[il]]
+      if(ic[il]){ # if this is a color:
+        if(p==i){  # if it's the current color
+          current=TRUE
+        }else{
+          current=FALSE
+        }
+      }else{ # it's some text
+        if(current){
+          # set as text
+          strings = c(strings,paste('"',p,'"',sep=""))
+        }else{
+          # set as phantom
+          strings = c(strings,paste("phantom(\"",p,"\")",sep=""))
+        }
+      }
+    } # next item
+    ## now plot this color
+    prod=paste(strings,collapse="*")
+    express = paste("expression(",prod,")",sep="")
+    e=eval(parse(text=express))
+    title(e,col.main=i)
+  } # next color
+  return()
+}
+
+multiMtext <- function(...){
+###
+### multi-coloured mtext
+###
+### examples:
+###  multiMtext(color="red","Traffic",
+###             color="orange"," light ",
+###             color="green","signal")
+###
+### - note triple backslashes needed for embedding quotes:
+###
+###  multiTitle(color="orange","Hello ",
+###             color="red"," \\\"world\\\"!")
+###
+### Barry Rowlingson <b.rowlingson@lancaster.ac.uk>
+###
+  l = list(...)
+  ic = names(l)=='color'
+  colors = unique(unlist(l[ic]))
+
+  for(i in colors){
+    color=par()$col.main
+    strings=c()
+    for(il in 1:length(l)){
+      p = l[[il]]
+      if(ic[il]){ # if this is a color:
+        if(p==i){  # if it's the current color
+          current=TRUE
+        }else{
+          current=FALSE
+        }
+      }else{ # it's some text
+        if(current){
+          # set as text
+          strings = c(strings,paste('"',p,'"',sep=""))
+        }else{
+          # set as phantom
+          strings = c(strings,paste("phantom(\"",p,"\")",sep=""))
+        }
+      }
+    } # next item
+    ## now plot this color
+    prod=paste(strings,collapse="*")
+    express = paste("expression(",prod,")",sep="")
+    e=eval(parse(text=express))
+    mtext(e,col=i,line=0.5,outer=T)
+  } # next color
+  return()
+}
