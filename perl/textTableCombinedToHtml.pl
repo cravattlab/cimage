@@ -52,6 +52,18 @@ if(@ARGV>2) {
 	print OUTFILE "run $j: <A HREF=\"$ARGV[$i]\">$ARGV[$i]</A><BR><BR>";
   }
 }
+print OUTFILE "<b>mr.set columns:</b><BR>";
+print OUTFILE "[bold] -- median value of measured ratios in this group<BR>";
+print OUTFILE "<b>sd.set columns:</b><BR>";
+print OUTFILE "[bold] -- standard deviation of measured ratios in this group<BR>";
+print OUTFILE "[plain] -- for each labeled peptide, number of peaks with triggered ms2 / number of candidate peaks for selection<BR>";
+print OUTFILE "<b>ratio calculation:</b><BR>";
+print OUTFILE "peak pairs with R2<0.8 are excluded<BR>";
+print OUTFILE "labeled peptides with invalid 1:10 ratios are excluded<BR>";
+print OUTFILE "<b>peptide grouping:</b><BR>";
+print OUTFILE "multiply labeled peptides are separated from singly labeled ones<BR>";
+print OUTFILE "singly labeled peptides with multiple alternative sites are grouped together<BR><BR>";
+
 print OUTFILE "<TABLE id=\"sample\" border=2 frame=\"border\" rules=\"groups\" summary=$intable>\n";
 ##print OUTFILE "<CAPTION> <b>$title</b> </CAPTION>\n";
 print OUTFILE "<COLGROUP span=1>\n";
