@@ -1,8 +1,15 @@
 #!/bin/bash
 
 if [ $# -lt 1 ]; then
-    echo Usage: $0 set_1 set_2 ...
+    echo Usage: $0 [silac] set_1 set_2 ...
     exit -1
+fi
+
+if [ "$1" == "silac" ]; then
+    silac="silac";
+    shift;
+else
+    silac="";
 fi
 
 mzxml=$@
@@ -19,10 +26,10 @@ do
     do
 	/home/chuwang/svnrepos/python/tagDTASelect.py $p2 > $p2.tagged;
 	#cat $p2.tagged | grep "^IPI" | sed 's/\ \*//g' > $p2.tagged.fwd;
-	cat $p2.tagged | grep $p1 | sed 's/IPI://g' | awk '{print $1}' > $p2.tmp.ipi
-	cat $p2.tagged | grep $p1 | sed 's/IPI://g' | awk '{print $2}' > $p2.tmp.FileName
-	cat $p2.tagged | grep $p1 | sed 's/IPI://g' | awk '{print $3}' > $p2.tmp.xcorr
-	cat $p2.tagged | grep $p1 | sed 's/IPI://g' | awk '{print $NF}' > $p2.tmp.peptide
+	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk '{print $1}' > $p2.tmp.ipi
+	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk '{print $2}' > $p2.tmp.FileName
+	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk '{print $3}' > $p2.tmp.xcorr
+	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk '{print $NF}' > $p2.tmp.peptide
 	cat $p2.tmp.peptide | sed 's/\*//g' | cut -f2 -d \.  > $p2.tmp.sequence
 	for p3 in $(cat $p2.tmp.sequence | sort | uniq )
 	do
@@ -41,8 +48,8 @@ do
 	paste -d":" $p2.tmp.ipi $p2.tmp.peptide $p2.tmp.charge $p2.tmp.segment > $p2.tmp.key
 	paste -d " " $p2.tmp.run $p2.tmp.scan $p2.tmp.mass $p2.tmp.xcorr $p2.tmp.key >> tmp.key_scan
 	rm -rf $p2.tmp.*
-	cat $p2 | grep Gene_Symbol | sed 's/IPI://g' | awk '{print $1} '| awk -F"|" '{print $1}'> tmp.ipi
-	cat $p2 | grep Gene_Symbol | sed 's/IPI://g' | cut -f3 -d"=" | cut -c1-50 | sed -e s/^\-/_/g > tmp.name
+	cat $p2.tagged | grep Gene_Symbol | sed 's/IPI://g' | awk '{print $1} '| awk -F"|" '{print $1}'> tmp.ipi
+	cat $p2.tagged | grep Gene_Symbol | sed 's/IPI://g' | cut -f3 -d"=" | cut -c1-50 | sed -e s/^\-/_/g > tmp.name
 	paste tmp.ipi tmp.name >> tmp.ipi_name
     done
 done
@@ -86,20 +93,20 @@ cat tmp.key_scan | awk '{print $NF, $1, $2}' >> all_scan.table
 rm -rf tmp.ipi tmp.name tmp.ipi_name tmp.key_scan tmp.seq_mass  *.tmp.scan
 
 echo Running xcms to extract chromatographic peaks
-R --vanilla --args $mzxml < /home/chuwang/svnrepos/R/findMs1AcrossSetsFromDTASelect.R > findMs1AcrossSetsFromDTASelect.Rout
+R --vanilla --args $silac $mzxml < /home/chuwang/svnrepos/R/findMs1AcrossSetsFromDTASelect.R > findMs1AcrossSetsFromDTASelect.Rout
 
 echo Generating graphs
 mkdir -p output/PNG
 cd output
 for p in $(\ls *.ps | sed 's/\.ps//g')
 do
+    ps2pdf $p.ps
     if [ $# -lt 3 ]; then
 	convert -rotate 90 $p.ps $p.png
     else
 	convert $p.ps $p.png
     fi
     mv $p*.png ./PNG/
-    ps2pdf $p.ps
 done
 cd ..
 
