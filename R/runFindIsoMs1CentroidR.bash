@@ -6,7 +6,7 @@ if [ $# -lt 1 ]; then
     echo Usage: $0 input_mzXML_file [fast]
     exit -1;
 fi
-
+/home/chuwang/svnrepos/iso_ms1_pair/makeScanNumToParentMzTable.bash $1
 R --vanilla --args $@ < /home/chuwang/svnrepos/R/findIsoMs1Centroid.R > $1.Rout
 
 exit 0
