@@ -2,12 +2,15 @@ library(xcms)
 source("/home/chuwang/svnrepos/R/msisotope.R")
 
 ## probe's mass added to peptide
-probe.mass <- c(464.28596)
-names(probe.mass) <- c("C")
+probe.mass <- c(464.28596,15.99940)
+names(probe.mass) <- c("C","M")
 ## 10 ppm to extract chromatographic peaks
 mz.ppm.cut <- 0.000010
 # From Eranthie's isotopically labeled probe
 pair.mass.delta <- 6.01381
+# From Justin's SILAC exp
+silac.mass.delta <- c( 8.0142, 10.0082,6.0138,7.0172)
+names(silac.mass.delta) <- c("K","R","V","L")
 # nature mass difference between C12 and C13
 isotope.mass.unit <- 1.0033548
 mass.shift <- round( pair.mass.delta/isotope.mass.unit )
@@ -16,6 +19,12 @@ Hplus.mass <- 1.0072765
 
 ## file name from input args
 args <- commandArgs(trailingOnly=T)
+if ( args[1] == "silac" ) {
+  silac <- T
+  args <- args[-1]
+} else {
+  silac <- F
+}
 output.path <- "output"
 dir.create(output.path)
 ## the table with protein names
@@ -89,7 +98,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-##for ( i in 1:1) {
+##for ( i in 1:10) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -101,18 +110,30 @@ for ( i in 1:dim(cross.table)[1] ) {
   entry.index <- which( entry.tag == entry.levels )
   description <- as.character(ipi.name.table[ipi,"name"])
   symbol<- strsplit(description, " ")[[1]][1]
-  peptide.vec <- unlist( strsplit(peptide,"",fixed=T) )
+  peptide.vec <- unlist( strsplit(peptide,".",fixed=T) )
+  peptide.vec <- unlist( strsplit(peptide.vec[2],"",fixed=T) )
   nmod <- length(which(peptide.vec=="*"))
   modified.mass <- sum( probe.mass[peptide.vec[which(peptide.vec=="*")-1]] )
   mono.mass  <- cross.table[i,"mass"]+modified.mass
   predicted.dist <- isotope.dist( averagine.count(mono.mass) )
   mass <- mono.mass + (which.max(predicted.dist) - 1)*isotope.mass.unit
   raw.scan.num <- cross.table[i,cross.vec]
-
+  ##
   ## mz
   mono.mz <- mono.mass/charge + Hplus.mass
   mz.light <- mass/charge + Hplus.mass
-  mz.heavy <- (mass+nmod*pair.mass.delta)/charge + Hplus.mass
+  if ( silac ) {
+    n.lys <- length(which(peptide.vec=="K"))
+    n.arg <- length(which(peptide.vec=="R"))
+    n.leu <- length(which(peptide.vec=="L"))
+    n.val <- length(which(peptide.vec=="V"))
+    pair.mass.delta <- n.lys*silac.mass.delta["K"]+n.arg*silac.mass.delta["R"]
+    ##pair.mass.delta <- n.lys*silac.mass.delta["K"]+n.val*silac.mass.delta["V"]+n.leu*silac.mass.delta["L"]
+    mz.heavy <- (mass+pair.mass.delta)/charge + Hplus.mass
+    mass.shift <- round( pair.mass.delta/isotope.mass.unit )
+  } else {
+    mz.heavy <- (mass+nmod*pair.mass.delta)/charge + Hplus.mass
+  }
   ## scan number
   ms1.scan.rt <- ms1.scan.num <- exist.index <- which( raw.scan.num > 0 )
   for ( k in 1:length(exist.index) ) {
@@ -233,7 +254,7 @@ for ( i in 1:dim(cross.table)[1] ) {
         ##yes2 <- light.yes > noise.light & heavy.yes > noise.heavy
         ##light.yes <- light.yes[yes2]
         ##heavy.yes <- heavy.yes[yes2]
-        if (ratio > 15 | ratio <0.4) next
+        ##if (ratio > 15 | ratio <0.4) next
         if (mono.check < 0.80) next
         npoints <- length(light.yes)
         if (npoints<3) {
