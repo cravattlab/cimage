@@ -14,7 +14,9 @@ rt.cut <- 10.0
 # ppm
 mz.ppm.cut <- 0.000025 # 25ppm
 # From Eranthie's isotopically labeled probe
-pair.mass.delta <- 6.01381
+# pair.mass.delta <- 6.01381
+# From jsc's isotopically labeled probe
+pair.mass.delta <- 1.0033548*7
 # nature mass difference between C12 and C13
 isotope.mass.unit <- 1.0033548
 mass.shift <- round( pair.mass.delta/isotope.mass.unit )
@@ -214,7 +216,7 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   peaks.maxo1 <- xpeaks[ as.character( pair.list.this.id[,"idx1"] ), "maxo"]
   peaks.maxo2 <- xpeaks[ as.character( pair.list.this.id[,"idx2"] ), "maxo"]
   peaks.maxo <- peaks.maxo1 + peaks.maxo2
-  peaks.maxo.cut <- peaks.maxo > max(peaks.maxo) * 0.1
+  peaks.maxo.cut <- peaks.maxo > max(peaks.maxo) * 0.01
   ## within same isotopic cluster, get rid background noise by 1% cut
   peaks.maxo <- peaks.maxo[peaks.maxo.cut]
   peaks.maxo1 <- peaks.maxo1[peaks.maxo.cut]
