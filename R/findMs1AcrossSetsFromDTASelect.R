@@ -10,20 +10,25 @@ mz.ppm.cut <- 0.000010
 pair.mass.delta <- 6.01381
 # From Justin's SILAC exp
 silac.mass.delta <- c( 8.0142, 10.0082,6.0138,7.0172)
+silac.num.N15 <- c(2,4,1,1)
+silac.num.C13 <- c(6,6,5,6)
 names(silac.mass.delta) <- c("K","R","V","L")
+names(silac.num.N15) <- c("K","R","V","L")
+names(silac.num.C13) <- c("K","R","V","L")
 # nature mass difference between C12 and C13
 isotope.mass.unit <- 1.0033548
+# natural mass difference between N14 and N15
+isotope.mass.unit.N15 <- 0.997035
 mass.shift <- round( pair.mass.delta/isotope.mass.unit )
 # mass of a proton
 Hplus.mass <- 1.0072765
 
 ## file name from input args
 args <- commandArgs(trailingOnly=T)
-if ( args[1] == "silac" ) {
-  silac <- T
+silac=""
+if ( substr(args[1],1,5) == "silac" ) {
+  silac <- args[1]
   args <- args[-1]
-} else {
-  silac <- F
 }
 output.path <- "output"
 dir.create(output.path)
@@ -98,7 +103,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-##for ( i in 1:10) {
+##for ( i in 1000:1200) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -120,19 +125,27 @@ for ( i in 1:dim(cross.table)[1] ) {
   raw.scan.num <- cross.table[i,cross.vec]
   ##
   ## mz
-  mono.mz <- mono.mass/charge + Hplus.mass
+  mono.mz.heavy <- mono.mz <- mono.mass/charge + Hplus.mass
   mz.light <- mass/charge + Hplus.mass
-  if ( silac ) {
+  if ( silac == "silac" ) {
     n.lys <- length(which(peptide.vec=="K"))
     n.arg <- length(which(peptide.vec=="R"))
-    n.leu <- length(which(peptide.vec=="L"))
-    n.val <- length(which(peptide.vec=="V"))
     pair.mass.delta <- n.lys*silac.mass.delta["K"]+n.arg*silac.mass.delta["R"]
     ##pair.mass.delta <- n.lys*silac.mass.delta["K"]+n.val*silac.mass.delta["V"]+n.leu*silac.mass.delta["L"]
     mz.heavy <- (mass+pair.mass.delta)/charge + Hplus.mass
     mass.shift <- round( pair.mass.delta/isotope.mass.unit )
+    mono.mz.heavy <- (mono.mass + pair.mass.delta)/charge + Hplus.mass
+  } else if ( silac == "silac2" ) {
+    n.lys <- length(which(peptide.vec=="K"))
+    n.leu <- length(which(peptide.vec=="L"))
+    n.val <- length(which(peptide.vec=="V"))
+    pair.mass.delta <- n.lys*silac.mass.delta["K"]+n.val*silac.mass.delta["V"]+n.leu*silac.mass.delta["L"]
+    mz.heavy <- (mass+pair.mass.delta)/charge + Hplus.mass
+    mass.shift <- round( pair.mass.delta/isotope.mass.unit )
+    mono.mz.heavy <- (mono.mass + pair.mass.delta)/charge + Hplus.mass
   } else {
     mz.heavy <- (mass+nmod*pair.mass.delta)/charge + Hplus.mass
+    mono.mz.heavy <- (mono.mass + nmod*pair.mass.delta)/charge + Hplus.mass
   }
   ## scan number
   ms1.scan.rt <- ms1.scan.num <- exist.index <- which( raw.scan.num > 0 )
@@ -310,7 +323,9 @@ for ( i in 1:dim(cross.table)[1] ) {
       n.max <- which.max(predicted.dist.merge)
       predicted.dist.merge <- predicted.dist.merge/predicted.dist.merge[n.max]
       mz.unit <- isotope.mass.unit/charge
-      predicted.mz <- mono.mz + mz.unit*(seq(1,length(predicted.dist.merge))-1)
+      predicted.mz <- mono.mz + mz.unit*(seq(1,mass.shift)-1)
+      predicted.mz.heavy <- mono.mz.heavy + mz.unit*(seq(1, length(predicted.dist.merge)-mass.shift)-1)
+      predicted.mz <- c(predicted.mz, predicted.mz.heavy)
       mz.max <- predicted.mz[n.max]
       mass.range <- c(mono.mz-2*mz.unit, mz.heavy+8*mz.unit)
       scan.data <- getScan(xfile, best.peak.scan.num, massrange=mass.range)
@@ -361,9 +376,11 @@ for ( i in 1:dim(cross.table)[1] ) {
         cex=0.8, line=2, out=T)
   mtext(paste(cross.table[i,"ipi"],description),line=0.8, cex=0.8,out=T)
   ## save data in outdf
+  lnk.i <- ceiling(i/500)-1
+  lnk.j <- (i%%500)-1
   this.df <- c(i, ipi, description, symbol, peptide, round(mass,digits=4), charge, segment,
                i.ratios, light.int.v, l.ratios, r2.v, entry.index,
-               paste('=HYPERLINK(\"./PNG/', out.filename.base,'-', as.character(i-1),'.png\")',sep=''))
+               paste('=HYPERLINK(\"./PNG/', lnk.i, '/', out.filename.base,'.', lnk.i, '-', lnk.j,'.png\")',sep=''))
   names(this.df) <- column.names
   out.df <- rbind(out.df, this.df)
 } ## each entry i

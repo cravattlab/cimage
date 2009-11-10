@@ -5,8 +5,9 @@ if [ $# -lt 1 ]; then
     exit -1
 fi
 
-if [ "$1" == "silac" ]; then
-    silac="silac";
+silac=$(echo $1 | cut -c1-5)
+if [ "$silac" == "silac" ]; then
+    silac=$1;
     shift;
 else
     silac="";
@@ -101,12 +102,29 @@ cd output
 for p in $(\ls *.ps | sed 's/\.ps//g')
 do
     ps2pdf $p.ps
+    npages=$(cat $p.to_excel.txt | wc -l)
+    nblock=$(($npages/500))
+    echo $p.ps has $npages pages
     if [ $# -lt 3 ]; then
-	convert -rotate 90 $p.ps $p.png
+	rotate="-rotate 90"
     else
-	convert $p.ps $p.png
+	rotate=""
     fi
-    mv $p*.png ./PNG/
+    nb=0;
+    while [ $nb -le $nblock ]; do
+	ns=$(($nb*500+1))
+	ne=$((($nb+1)*500))
+	if [ $ne -ge $npages ]; then ne=""; fi
+	mkdir -p PNG/$nb
+	echo converting pages $ns-$ne
+	psselect -q -p$ns-$ne $p.ps ./PNG/$nb/$p.$nb.ps
+	cd PNG/$nb
+	convert $rotate $p.$nb.ps $p.$nb.png
+	rm -rf $p.$nb.ps
+	cd ../../
+	nb=$(($nb+1))
+    done
+    echo done with $p.ps
 done
 cd ..
 
