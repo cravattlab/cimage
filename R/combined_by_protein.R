@@ -58,19 +58,15 @@ vn4 <- paste("INT.set_",seq(1,nset),sep="")
 
 all.table <- NULL
 for (i in 1:length(dirs) ) {
-  table[[i]] <- read.table(paste(dirs[i],input.file,sep=""),header=T,sep="\t",quote="")
+  table[[i]] <- read.table(paste(dirs[i],input.file,sep=""),header=T,sep="\t",quote="",as.is=T)
   names(table[[i]])[c(v1,v2,v3,v4)] <- c(vn1,vn2,vn3,vn4)
   table[[i]][,"sequence"] <- as.character( table[[i]][,"sequence"] )
   table[[i]]$run<-i
   table[[i]]$uniq <-i
   table[[i]]$filter <- 0
-  for (ii in 1:length(table[[i]]$ipi) ) {
-    sequence <- as.character(table[[i]][ii,"sequence"])
-    sequence <- uniq.tryptic.sequence( sequence )
-    table[[i]]$uniq[ii]<- sequence
-  }
   all.table<-rbind(all.table, table[[i]])
 }
+all.table$uniq <- all.table$ipi
 
 ## set to NA if not passing r2.cutoff
 for( i in 1:length(vn1) ) {
@@ -102,13 +98,15 @@ for (uniq in levels(as.factor(all.table$uniq) ) ) {
   s3 <- sub.table[,"charge"]
   s4 <- sub.table[,"segment"]
 
-  ii <- order(s1,s2,s5,s3,s4)
+  ii <- order(s5,s2,s1,s3,s4)
   count <- count+1
   link.list[[count]] <- which(match)[ii]
 
   pass <- sub.table$filter>=1
   out.char.matrix[count,"index"] <- as.character(count)
-  out.char.matrix[count,"sequence"] <- as.character(uniq)
+  out.char.matrix[count,"ipi"] <- as.character(uniq)
+  out.char.matrix[count,"description"] <- sub.table[1,"description"]
+  out.char.matrix[count,"symbol"] <- sub.table[1,"symbol"]
   out.char.matrix[count,"run"] <- paste(levels(as.factor(sub.table[,"run"])),sep="",collapse="")
   out.char.matrix[count,"charge"] <- paste(levels(as.factor(sub.table[,"charge"])),sep="",collapse="")
   out.char.matrix[count,"segment"] <- paste(levels(as.factor(sub.table[,"segment"])),sep="",collapse="")
@@ -149,7 +147,12 @@ for ( m in 1:length(z.order)) {
     for ( c in char.names ) {
       this.c.entry[c] <- as.character(sub.table[l,c])
     }
+    ## empty these columns as they are same as those in the averaged line
     this.c.entry["index"] <- sp
+    this.c.entry["ipi"] <- sp
+    this.c.entry["description"] <- sp
+    this.c.entry["symbol"] <- sp
+
     this.c.entry["link"] <- new.link
     new.char.matrix <- rbind(new.char.matrix,this.c.entry)
     for ( n in 1:nset ) {
@@ -169,6 +172,8 @@ html.table <- cbind(new.char.matrix[,seq(1,cmass)], ##count to mass
                     )
 
 write.table(html.table,file="combined.txt", quote=F, sep="\t", row.names=F,na="0.00")
+html.table2 <- html.table[html.table[,"index"]!=sp,]
+write.table(html.table2,file="combined_averaged_ratios.txt", quote=F, sep="\t", row.names=F,na="0.00")
 
 png("combined.png")
 ratio <- out.num.matrix[z.order,]
