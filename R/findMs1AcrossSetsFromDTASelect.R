@@ -2,8 +2,8 @@ library(xcms)
 source("/home/chuwang/svnrepos/R/msisotope.R")
 
 ## probe's mass added to peptide
-probe.mass <- c(464.28596,15.99940)
-names(probe.mass) <- c("C","M")
+probe.mass <- c(464.28596,15.99940,79.96630,79.96630,79.96630)
+names(probe.mass) <- c("C","M","S","T","Y")
 ## 10 ppm to extract chromatographic peaks
 mz.ppm.cut <- 0.000010
 # From Eranthie's isotopically labeled probe
@@ -103,7 +103,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-##for ( i in 1000:1200) {
+##for ( i in 835:835) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -267,7 +267,7 @@ for ( i in 1:dim(cross.table)[1] ) {
         ##yes2 <- light.yes > noise.light & heavy.yes > noise.heavy
         ##light.yes <- light.yes[yes2]
         ##heavy.yes <- heavy.yes[yes2]
-        ##if (ratio > 15 | ratio <0.4) next
+        if (silac=="" && (ratio > 15 | ratio <0.4)) next
         if (mono.check < 0.80) next
         npoints <- length(light.yes)
         if (npoints<3) {
