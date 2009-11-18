@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ $# -lt 1 ]; then
-    echo Usage: $0 [silac] set_1 set_2 ...
+    echo Usage: $0 [silac] [no_png] set_1 set_2 ...
     exit -1
 fi
 
