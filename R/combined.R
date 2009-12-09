@@ -79,7 +79,7 @@ for( i in 1:length(vn1) ) {
 }
 ## only consider entries with at least two valid ratios out of three concentrations
 for( i in 1:nrow(all.table) ) {
-  all.table[i,"filter"] <- sum(all.table[i,vn1[nset]]>0, na.rm=T)
+  all.table[i,"filter"] <- sum(all.table[i,vn1[1:nset]]>0, na.rm=T)
 }
 
 sp=" "
