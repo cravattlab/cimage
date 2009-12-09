@@ -47,7 +47,16 @@ all.scan.table <- read.table("all_scan.table", header=T)
 ## file name tags
 cross.vec <- as.character(args)
 ncross <- length(cross.vec)
-
+# handle switching of Heavy to light ratio, by default it is light vs heavy
+HL.ratios <- rep(FALSE,ncross)
+j <- 0
+for ( arg in as.character(args) ) {
+  j <- j+1
+  cross.vec[j] <- sub("_HL$","",arg)
+  if ( cross.vec[j] != arg ) {
+    HL.ratios[j] <- TRUE
+  }
+}
 ## find all matched input files in current directory
 ##if(FALSE) {
 input.path <- getwd()
@@ -255,10 +264,18 @@ for ( i in 1:dim(cross.table)[1] ) {
         heavy.yes <- raw.ECI.heavy[[2]][yes]
 
         peak.scan.num <- raw.ECI.light[[1]][yes][which.max(light.yes)]
-        peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.mass-2)/charge, mz.heavy) )
+        if ( mass.shift > 0 ) {
+          peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.mass-2)/charge, mz.heavy) )
+        } else {
+          peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.mass-2)/charge, mz.heavy+5) )
+        }
         mono.check <- checkChargeAndMonoMass( peak.scan, mono.mass, charge, mz.ppm.cut, predicted.dist)
         ## calculate ratio of integrated peak area
-        ratio <- round(sum(light.yes)/sum(heavy.yes),digits=2)
+        if (HL.ratios[j]) {
+          ratio <- round(sum(heavy.yes)/sum(light.yes),digits=2)
+        } else {
+          ratio <- round(sum(light.yes)/sum(heavy.yes),digits=2)
+        }
         lines(c(low,low),ylimit/10, col="green")
         lines(c(high,high),ylimit/10, col="green")
         text(mean(c(low,high)),max(light.yes,heavy.yes)*1.2,
@@ -319,11 +336,19 @@ for ( i in 1:dim(cross.table)[1] ) {
       r2.v[j] <- best.r2
       ## plot raw spectrum
       predicted.dist <- predicted.dist[1:20]
-      predicted.dist.merge <- best.ratio*c(predicted.dist, rep(0,mass.shift)) + c(rep(0,mass.shift),predicted.dist)
+      if (HL.ratios[j]) {
+        predicted.dist.merge <- (1/best.ratio)*c(predicted.dist, rep(0,mass.shift)) + c(rep(0,mass.shift),predicted.dist)
+      } else {
+        predicted.dist.merge <- (best.ratio)*c(predicted.dist, rep(0,mass.shift)) + c(rep(0,mass.shift),predicted.dist)
+      }
       n.max <- which.max(predicted.dist.merge)
       predicted.dist.merge <- predicted.dist.merge/predicted.dist.merge[n.max]
       mz.unit <- isotope.mass.unit/charge
-      predicted.mz <- mono.mz + mz.unit*(seq(1,mass.shift)-1)
+      if ( mass.shift > 0 ) {
+        predicted.mz <- mono.mz + mz.unit*(seq(1,mass.shift)-1)
+      } else {
+        predicted.mz <- NULL
+      }
       predicted.mz.heavy <- mono.mz.heavy + mz.unit*(seq(1, length(predicted.dist.merge)-mass.shift)-1)
       predicted.mz <- c(predicted.mz, predicted.mz.heavy)
       mz.max <- predicted.mz[n.max]
@@ -354,9 +379,13 @@ for ( i in 1:dim(cross.table)[1] ) {
       plot(predicted.mz, observed.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit, col="black")
       par(new=T)
       plot( predicted.mz, predicted.dist.merge, type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
-      light.n <- seq(1,(mass.shift))
+      if ( mass.shift >0 ){
+        light.n <- seq(1,(mass.shift))
+        heavy.n <- seq((mass.shift+1),2*mass.shift)
+      } else {
+        light.n <- heavy.n <- seq(1,3)
+      }
       points(predicted.mz[light.n],rep(0,length(light.n)), pch=23,col="red",bg="red")
-      heavy.n <- seq((mass.shift+1),2*mass.shift)
       points(predicted.mz[heavy.n],rep(0,length(heavy.n)), pch=24,col="blue",bg="blue")
       title( paste("Scan # ", xfile@acquisitionNum[best.peak.scan.num], " @ ",
                    round(xfile@scantime[best.peak.scan.num]/60,1)," min; NL:",
