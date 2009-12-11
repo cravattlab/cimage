@@ -69,7 +69,7 @@ cat tmp.ipi_name | tr -d '\r' | sort | uniq | sed -e s/\'//g | sed -e s/\"//g | 
 ## table with scans from different dataset
 scanfiles=""
 keys=$(cat tmp.key_scan | awk '{print $NF}' | sort | uniq )
-for p1 in $mzxml
+for p1 in $(echo $mzxml | sed 's/\_HL$//g')
 do
     echo $p1 > $p1.tmp.scan
     for key in $keys
