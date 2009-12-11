@@ -30,6 +30,7 @@ fi
 
 mv combined.txt $outname.txt
 mv combined.png $outname.png
+mv combined_vennDiagram.png $outname.vennDiagram.png
 
-/home/chuwang/svnrepos/perl/textTableCombinedToHtml.pl $outname.txt $outname.png $allpt
+/home/chuwang/svnrepos/perl/textTableCombinedToHtml.pl $outname.txt $outname $allpt
 

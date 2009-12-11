@@ -120,6 +120,15 @@ for (uniq in levels(as.factor(all.table$uniq) ) ) {
 ## order by ratio from last set to first set
 z.order <- do.call("order", data.frame(out.num.matrix[,seq(nset,1)]))
 
+## draw venn diagrams of averaged ratios
+library(limma)
+png("combined_vennDiagram.png")
+venn.out.matrix <- ! is.na(out.num.matrix[,seq(1,length=nset)])
+vc <- vennCounts(venn.out.matrix)
+vennDiagram(vc,main="Number of proteins with valid ratios",counts.col="red")
+dev.off()
+##
+
 new.num.matrix <- out.num.matrix[F,]
 new.char.matrix <- out.char.matrix[F,]
 

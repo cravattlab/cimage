@@ -44,7 +44,8 @@ table#sample TD {
 ENDOFHEADER
 
 if(@ARGV>1) {
-    print OUTFILE "<A HREF=\"$ARGV[1]\">ratio plot</A><BR><BR>\n";
+    print OUTFILE "<A HREF=\"$ARGV[1]\.png\">Ratio Plot</A><BR><BR>\n";
+    print OUTFILE "<A HREF=\"$ARGV[1]\.vennDiagram\.png\">Venn Diagram</A><BR><BR>\n";
 }
 if(@ARGV>2) {
     for ( $i=2; $i<@ARGV; $i++ ) {
