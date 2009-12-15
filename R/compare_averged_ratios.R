@@ -75,7 +75,7 @@ write.table(html.table, file=paste("compare_averaged_ratios",paste(output.cols,s
             quote=F, sep="\t", row.names=F,na="0.00")
 
 library(limma)
-png("compare_averaged_ratios_vennDiagram.png")
+png(paste("compare_averaged_ratios_vennDiagram",paste(output.cols,sep="",collapse="_"),"png",sep="."))
 venn.out.matrix <- ! is.na(out.num.matrix)
 vc <- vennCounts(venn.out.matrix)
 vennDiagram(vc,main="Number of peptides with valid ratios",counts.col="red")
