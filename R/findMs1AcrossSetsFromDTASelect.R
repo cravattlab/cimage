@@ -426,6 +426,9 @@ for ( s in seq(ncross, 1) ) {
   colname.IR <- integrated.area.ratio[s]
   rsq.filter <- all.table[,colname.R2] >= rsq.cutoff & !is.na(all.table[,colname.R2])
   table <- all.table[rsq.filter,]
+  if (is.vector(table)) {
+    table <- data.frame(as.list(table))
+  }
   s1 <- as.numeric(table[,colname.IR])
   s2 <- as.numeric(table[,"entry"])
   s3 <- as.numeric(table[,"charge"])
