@@ -80,3 +80,15 @@ venn.out.matrix <- ! is.na(out.num.matrix)
 vc <- vennCounts(venn.out.matrix)
 vennDiagram(vc,main="Number of peptides with valid ratios",counts.col="red")
 dev.off()
+
+if (ncol(venn.out.matrix)==2) {
+  png(paste("compare_averaged_ratios_scatterplot",paste(output.cols,sep="",collapse="_"),"png",sep="."))
+  out.num.matrix[is.na(out.num.matrix)] <- 0.0
+  qtt <- quantile(as.numeric(out.num.matrix),probs=seq(0,1,0.01))
+  limit <- c(qtt[2],qtt[length(qtt)-1])
+  plot(out.num.matrix[,1], out.num.matrix[,2],main="averaged ratios comparison",xlab=output.cols[1],ylab=output.cols[2],
+       xlim=limit,ylim=limit)
+  abline(0,1)
+
+  dev.off()
+}
