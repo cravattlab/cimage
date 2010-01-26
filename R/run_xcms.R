@@ -1,6 +1,7 @@
+args <- commandArgs(trailingOnly=T)
 ### I/O options ###
-folder1 <- "wt"
-folder2 <- "b"
+folder1 <- args[1]
+folder2 <- args[2]
 result <- "results"
 ###################
 library(xcms)
@@ -11,11 +12,15 @@ xset.list[[length(xset.list)+1]] <- xset.cur <- xset
 
 last.rtcg.num <- rtcg.num <- 0
 do.retcor <- T
+count <- 0
 while( do.retcor ) {
   Sys.sleep(1)
   last.rtcg.num <- rtcg.num
   sink("xcms.rtcg.out",split=T)
+  count <- count + 1
+  png(paste("retcor_",count,".png",sep=""))
   xset.new <- retcor(xset.cur, family="s", plottype="m")
+  dev.off()
   sink()
   rtcg.sink <- read.table("xcms.rtcg.out",header=F)
   rtcg.num <- rtcg.sink[1,5]
