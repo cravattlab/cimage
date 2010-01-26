@@ -41,7 +41,7 @@ else
 	/home/chuwang/svnrepos/python/peptideCalcMass.py $seq mono | awk -v tag=$mass '{printf "%10.5f %10.5f\n", $1, $1+tag}' >> tryp_digest.$tryp.mass
     done
     paste -d " " tryp_digest.$tryp.seq tryp_digest.$tryp.mass > tryp_digest.$tryp
-    for l in list_0.9_1.05_0.1.txt
+    for l in list_0.7_1.10_0.3.txt
     do
 	for t in $(cat $l | awk '{print $NF}' )
 	do
