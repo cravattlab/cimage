@@ -14,9 +14,9 @@ rt.cut <- 10.0
 # ppm
 mz.ppm.cut <- 0.000025 # 25ppm
 # From Eranthie's isotopically labeled probe
-# pair.mass.delta <- 6.01381
+pair.mass.delta <- 6.01381
 # From jsc's isotopically labeled probe
-pair.mass.delta <- 1.0033548*7
+##pair.mass.delta <- 1.0033548*7
 # nature mass difference between C12 and C13
 isotope.mass.unit <- 1.0033548
 mass.shift <- round( pair.mass.delta/isotope.mass.unit )
@@ -53,19 +53,19 @@ if ( length(args) >1 & args[2] == "fast" ) {
 } else {
   xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=2.0, minptsperpeak=2)
 }
-                                        # sort the matrix by retention time first
+## sort the matrix by retention time first
 xpeaks.save <- xpeaks
 xpeaks <- xpeaks[order(xpeaks[,"rt"]), ]
 
-                                        # label rownames
+## label rownames
 num.peaks <- dim(xpeaks)[1]
 rownames(xpeaks) <- seq(1, num.peaks)
 
-# table with raw pair peak index, charge, rt and hit.id etc
+## table with raw pair peak index, charge, rt and hit.id etc
 out.filename0 <- paste(output.path, output.file.base, ".xcms_peaks.txt", sep="")
 write.table( format(xpeaks,digits=10), out.filename0, quote=FALSE, row.names=FALSE)
 
-                                        # make a fresh empty list
+## make a fresh empty list
 n.nonredundant.hit <- 0
 pair.list <- data.frame(idx1=numeric(0),idx2=numeric(0),charge=numeric(0),
                         mz1=numeric(0), mz2=numeric(0),
@@ -81,7 +81,7 @@ for ( rt.i in 1:length(rt.list) ) {
   this.rt <- (xpeaks[,"rt"] > rt.range[1]) & (xpeaks[,"rt"] < rt.range[2] )
   #this.rt <- factor(xpeaks[,"rt"])==rt
   if ( sum(this.rt) <= 1 ) next
-                                        # get all peaks with this retension time and sort by mz
+  ## get all peaks with this retension time and sort by mz
   xpeaks.this.rt <- xpeaks[this.rt,]
   xpeaks.this.rt <- xpeaks.this.rt[order(xpeaks.this.rt[,"mz"]), ]
   mz.this.rt <- xpeaks.this.rt[,"mz"]
