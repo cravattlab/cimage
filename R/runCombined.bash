@@ -30,7 +30,11 @@ fi
 
 mv combined.txt $outname.txt
 mv combined.png $outname.png
-mv combined_vennDiagram.png $outname.vennDiagram.png
+if [ -s combined_vennDiagram.png ]; then
+    mv combined_vennDiagram.png $outname.vennDiagram.png
+fi
 
-/home/chuwang/svnrepos/perl/textTableCombinedToHtml.pl $outname.txt $outname $allpt
+cwd=$(pwd)
+
+/home/chuwang/svnrepos/perl/textTableCombinedToHtml.pl $outname $cwd $allpt
 
