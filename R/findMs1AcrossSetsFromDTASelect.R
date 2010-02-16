@@ -44,7 +44,7 @@ cross.table <- cbind(cross.table, split.table)
 uniq.ipi.peptides <- as.factor(paste(cross.table[,"ipi"], cross.table[,"peptide"],sep=":"))
 entry.levels <- levels( uniq.ipi.peptides )
 ## all_scan.table
-all.scan.table <- read.table("all_scan.table", header=T)
+all.scan.table <- read.table("all_scan.table", header=T, as.is=T)
 ## file name tags
 cross.vec <- as.character(args)
 ncross <- length(cross.vec)
@@ -96,13 +96,14 @@ colnames(out.df) <- column.names
 ## output layout
 out.filename.base <- paste("output_rt_",as.character(rt.window),"_sn_",
                       as.character(sn),sep="")
-out.filename <- paste(output.path,"/",out.filename.base,".ps",sep="")
-out.filename.r2 <- paste(output.path,"/",out.filename.base,".ps",sep="")
+out.filename <- paste(output.path,"/",out.filename.base,".pdf",sep="")
+out.filename.r2 <- paste(output.path,"/",out.filename.base,".pdf",sep="")
 horiz.layout <- F
 if (ncross < 3) {
   horiz.layout <- T
 }
-postscript( out.filename, horizontal=horiz.layout)
+
+pdf( out.filename, height=4*ncross, width=11, paper="special")
 layout.vec <- row.layout.vec <- c(1,1,2,1,1,3)
 if ( ncross > 1 ) {
   for (i in 1:(ncross-1)) {
@@ -113,7 +114,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-##for ( i in 835:835) {
+##for ( i in 835:850) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -221,22 +222,38 @@ for ( i in 1:dim(cross.table)[1] ) {
     plot(raw.ECI.light.rt, raw.ECI.light[[2]], type="l", col="red",xlab="Retention Time(min)",
          ylab="intensity", main=tt.main, xlim=xlimit,ylim=ylimit)
     lines(raw.ECI.heavy.rt, raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
-    k.ms1.rt.v <- numeric(0)
+    k.ms1.rt.v <- k.ms1.scan.v <- numeric(0)
     if ( !is.na(tag.rt) ) {
       all.ms2.scan <- as.integer( all.scan.table[(key==all.scan.table[,"key"]
                                                   &cross.vec[j]==all.scan.table[,"run"]),"scan"] )
+      all.ms2.HL <- all.scan.table[(key==all.scan.table[,"key"]
+                                    &cross.vec[j]==all.scan.table[,"run"]),"HL"]
       for (k in 1:length(all.ms2.scan)) {
         k.ms1.scan <- which(xfile@acquisitionNum > all.ms2.scan[k])[1]-1
         if (is.na(k.ms1.scan)) {
           k.ms1.scan <- length(xfile@acquisitionNum)
         }
         k.ms1.rt <- xfile@scantime[k.ms1.scan]/60
-        points(k.ms1.rt, raw.ECI.light[[2]][k.ms1.scan], type='p',cex=0.5, pch=1)
+        if (all.ms2.HL[k] == "light") {
+          points(k.ms1.rt, raw.ECI.light[[2]][k.ms1.scan], type='p',cex=0.5, pch=1)
+        } else if (all.ms2.HL[k] == "heavy") {
+          points(k.ms1.rt, raw.ECI.heavy[[2]][k.ms1.scan], type='p',cex=0.5, pch=1)
+        } else {
+          points(k.ms1.rt, max(raw.ECI.light[[2]][k.ms1.scan],raw.ECI.heavy[[2]][k.ms1.scan]),
+                 type='p',cex=0.5, pch=1,col="black")
+        }
         k.ms1.rt.v <- c(k.ms1.rt.v,k.ms1.rt)
+        k.ms1.scan.v <- c(k.ms1.scan.v,k.ms1.scan)
       }
       ##lines(c(tag.rt,tag.rt),c(0.0, max(raw.ECI.light[[2]],raw.ECI.heavy[[2]])), col="green")
-      points(tag.rt, raw.ECI.light[[2]][tag.ms1.scan.num], type='p',pch=8)
-
+      HL <- all.ms2.HL[k.ms1.scan.v == tag.ms1.scan.num][1]
+      if (HL == "light") {
+        points(tag.rt, raw.ECI.light[[2]][tag.ms1.scan.num], type='p',pch=8)
+      } else if (HL == "heavy") {
+        points(tag.rt, raw.ECI.heavy[[2]][tag.ms1.scan.num], type='p',pch=8)
+      } else {
+        points(tag.rt, max(raw.ECI.light[[2]][tag.ms1.scan.num],raw.ECI.heavy[[2]][tag.ms1.scan.num]), type='p',pch=8)
+      }
       ## guess ratio of integrated peak area
       local.xlimit <- c(max(scan.time.range[1]/60, tag.rt-local.rt.window),
                         min(scan.time.range[2]/60, tag.rt+local.rt.window))
@@ -408,9 +425,10 @@ for ( i in 1:dim(cross.table)[1] ) {
   ## save data in outdf
   lnk.i <- ceiling(i/500)-1
   lnk.j <- (i%%500)-1
+  lnk.name <- paste('./PNG/', lnk.i, '/', out.filename.base,'.', lnk.i, '-', lnk.j,'.png',sep='')
   this.df <- c(i, ipi, description, symbol, peptide, round(mass,digits=4), charge, segment,
                i.ratios, light.int.v, l.ratios, r2.v, entry.index,
-               paste('=HYPERLINK(\"./PNG/', lnk.i, '/', out.filename.base,'.', lnk.i, '-', lnk.j,'.png\")',sep=''))
+               paste('=HYPERLINK(\"./PNG/', lnk.i, '/', out.filename.base,'.', lnk.i, '_', lnk.j,'.png\")',sep=''))
   names(this.df) <- column.names
   out.df <- rbind(out.df, this.df)
 } ## each entry i

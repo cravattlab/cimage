@@ -31,11 +31,12 @@ do
     echo $p1
     for p2 in $(ls DTASelect-filter_$p1\_*.txt);
     do
+	HL=$(echo $p2 | sed 's/\.txt$//g' | awk -F "_" '{print $NF}')
 	/home/chuwang/svnrepos/python/tagDTASelect.py $p2 > $p2.tagged;
 	#cat $p2.tagged | grep "^IPI" | sed 's/\ \*//g' > $p2.tagged.fwd;
 	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk '{print $1}' > $p2.tmp.ipi
 	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk '{print $2}' > $p2.tmp.FileName
-	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk '{print $3}' > $p2.tmp.xcorr
+	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk -v HL=$HL '{print $3, HL}' > $p2.tmp.xcorr
 	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk '{print $NF}' > $p2.tmp.peptide
 	cat $p2.tmp.peptide | sed 's/\*//g' | cut -f2 -d \.  > $p2.tmp.sequence
 	for p3 in $(cat $p2.tmp.sequence | sort | uniq )
@@ -94,8 +95,8 @@ done
 paste -d " " tmp.seq_mass $scanfiles > cross_scan.table
 
 ## table with all ms2 scans
-echo "key run scan" > all_scan.table
-cat tmp.key_scan | awk '{print $NF, $1, $2}' >> all_scan.table
+echo "key run scan HL" > all_scan.table
+cat tmp.key_scan | awk '{print $NF, $1, $2, $(NF-1)}' >> all_scan.table
 
 rm -rf tmp.ipi tmp.name tmp.ipi_name tmp.key_scan tmp.seq_mass  *.tmp.scan
 
@@ -104,37 +105,48 @@ R --vanilla --args $silac $mzxml < /home/chuwang/svnrepos/R/findMs1AcrossSetsFro
 
 echo Generating graphs
 cd output
-for p in $(\ls *.ps | sed 's/\.ps//g')
+for p in $(\ls *.pdf | sed 's/\.pdf//g')
 do
-    ps2pdf $p.ps
-    if [ "$no_png" == "no_png" ]; then
-	echo no png graphic conversion as requested
-    else
+    ##ps2pdf $p.ps
+##    if [ "$no_png" == "no_png" ]; then
+	##echo no png graphic conversion as requested
+##    else
+	##pdftops $p.pdf $p.ps
 	mkdir -p PNG
 	npages=$(cat $p.to_excel.txt | wc -l)
 	nblock=$(($npages/500))
-	echo $p.ps has $npages pages
-	if [ $# -lt 3 ]; then
-	    rotate="-rotate 90"
-	else
-	    rotate=""
-	fi
+	echo $p.pdf has $npages pages
+	##if [ $# -lt 3 ]; then
+	##    rotate="-rotate 90"
+	##else
+	##    rotate=""
+	##fi
 	nb=0;
 	while [ $nb -le $nblock ]; do
 	    ns=$(($nb*500+1))
 	    ne=$((($nb+1)*500))
-	    if [ $ne -ge $npages ]; then ne=""; fi
+	    if [ $ne -ge $npages ]; then ne=$(($npages-1)); fi
 	    mkdir -p PNG/$nb
 	    echo converting pages $ns-$ne
-	    psselect -q -p$ns-$ne $p.ps ./PNG/$nb/$p.$nb.ps
+	   ## psselect -q -p$ns-$ne $p.ps ./PNG/$nb/$p.$nb.ps
+	    pdftk A=$p.pdf cat A$ns-$ne output ./PNG/$nb/$p.$nb.pdf
 	    cd PNG/$nb
-	    convert $rotate $p.$nb.ps $p.$nb.png
-	    rm -rf $p.$nb.ps
+	    ##convert  $p.$nb.ps $p.$nb.png
+	    ##rm -rf $p.$nb.ps
+	    pdftk $p.$nb.pdf burst
+	    for pp in $(\ls pg_*.pdf | sed 's/\.pdf//g')
+	    do
+		pn=$(echo $pp | cut -f2 -d\_)
+		pn2=$(echo $pn | awk '{print $1-1}')
+		convert $pp.pdf $p.$nb\_$pn2.png 2> /dev/null
+	    done
+	    rm -rf *.pdf doc_data.txt
 	    cd ../../
 	    nb=$(($nb+1))
 	done
-    fi
-    echo done with $p.ps
+	##rm -rf $p.ps
+##    fi
+    echo done with $p.pdf
 done
 cd ..
 
