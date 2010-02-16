@@ -2,8 +2,8 @@
 
 die "Usage: $0 text_table [ratio.png] [run_dirs] \n" if (@ARGV <1 );
 
-$intable=$ARGV[0];
-##$title=$ARGV[1];
+$intable="$ARGV[0].txt";
+$cwd=$ARGV[1];
 
 open(INFILE,$intable) || die "cannot open $intable: $!\n";
 @txt = <INFILE>;
@@ -23,8 +23,8 @@ for ($i=0; $i<$ncol; ++$i) {
 }
 
 
-$outhtml=$intable;
-$outhtml =~ s/\.txt$/\.html/g;
+$outhtml="$ARGV[0].html";
+##$outhtml =~ s/\.txt$/\.html/g;
 
 open(OUTFILE, ">$outhtml") || die "cannot write to $outhtml: $!\n";
 ##print OUTFILE "Content-type: text/html\n\n";
@@ -43,9 +43,10 @@ table#sample TD {
 <BODY>
 ENDOFHEADER
 
-if(@ARGV>1) {
-    print OUTFILE "<A HREF=\"$ARGV[1]\.png\">Ratio Plot</A><BR><BR>\n";
-    print OUTFILE "<A HREF=\"$ARGV[1]\.vennDiagram\.png\">Venn Diagram</A><BR><BR>\n";
+print OUTFILE "<A HREF=\"http://137.131.5.161/cgi-bin/chuquest/batch_annotate.pl?dset=$cwd/$intable\">Gabe's Uniprot Batch Annotation</A><BR><BR>\n";
+print OUTFILE "<A HREF=\"$ARGV[0]\.png\">Ratio Plot</A><BR><BR>\n";
+if( -e "$ARGV[0].vennDiagram.png" ) {
+    print OUTFILE "<A HREF=\"$ARGV[0]\.vennDiagram\.png\">Venn Diagram</A><BR><BR>\n";
 }
 if(@ARGV>2) {
     for ( $i=2; $i<@ARGV; $i++ ) {
