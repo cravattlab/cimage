@@ -6,6 +6,6 @@ if [ $# -lt 3 ]; then
     exit -1
 fi
 
-R --vanilla --args $@ < /home/chuwang/svnrepos/R/compare_averged_ratios.R > compare_averged_ratios.Rout
+R --vanilla --args $@ < /home/chuwang/svnrepos/R/compare_averged_ratios.R > compare_averaged_ratios.Rout
 
 
