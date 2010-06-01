@@ -29,7 +29,7 @@ echo Parsing DTASelect files
 for p1 in $(echo $mzxml | sed 's/\_HL$//g')
 do
     echo $p1
-    for p2 in $(ls DTASelect-filter_$p1\_*.txt);
+    for p2 in $(ls DTASelect-filter_$p1\_[hl]*.txt);
     do
 	HL=$(echo $p2 | sed 's/\.txt$//g' | awk -F "_" '{print $NF}')
 	/home/chuwang/svnrepos/python/tagDTASelect.py $p2 > $p2.tagged;
