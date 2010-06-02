@@ -21,11 +21,11 @@ print_on = True
 for line in open(argv[1]):
     line = line.rstrip()
     words = line.split()
-    if len(words) == 0:
+    if len(words) <= 3:
         print
         continue
     # none peptide entry line
-    if words[0].find('IPI0') != -1 or words[0]=='Proteins':
+    if words[3].find('%') != -1 or words[0]=='Proteins':
         if words[0]=='Proteins':
             print_on = True
         else:
@@ -34,7 +34,7 @@ for line in open(argv[1]):
         if last_line_is_peptide:
             # print out saved lines
             for ipi in ipi_lines:
-                print ipi
+                print 'cimageipi-'+ipi
                 # find tag
                 ipi_words = ipi.split()
                 i = ipi_words[0].find("|")
@@ -44,7 +44,7 @@ for line in open(argv[1]):
                     tag = ipi_words[0]
                 # print out tagged lines
                 for pep in pep_lines:
-                    print tag, pep[1:]
+                    print 'cimagepep-'+tag, pep[1:]
             # emtpy lists
             ipi_lines = []
             pep_lines = []

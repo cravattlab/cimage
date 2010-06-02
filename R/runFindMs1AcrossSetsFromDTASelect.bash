@@ -33,11 +33,10 @@ do
     do
 	HL=$(echo $p2 | sed 's/\.txt$//g' | awk -F "_" '{print $NF}')
 	/home/chuwang/svnrepos/python/tagDTASelect.py $p2 > $p2.tagged;
-	#cat $p2.tagged | grep "^IPI" | sed 's/\ \*//g' > $p2.tagged.fwd;
-	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk '{print $1}' > $p2.tmp.ipi
-	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk '{print $2}' > $p2.tmp.FileName
-	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk -v HL=$HL '{print $3, HL}' > $p2.tmp.xcorr
-	cat $p2.tagged | grep ^IPI | grep $p1 | sed 's/IPI://g' | awk '{print $NF}' > $p2.tmp.peptide
+	cat $p2.tagged | grep ^cimagepep | grep $p1 | sed 's/^cimagepep\-//g' | sed 's/IPI://g' | awk '{print $1}' > $p2.tmp.ipi
+	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk '{print $2}' > $p2.tmp.FileName
+	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk -v HL=$HL '{print $3, HL}' > $p2.tmp.xcorr
+	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk '{print $NF}' > $p2.tmp.peptide
 	cat $p2.tmp.peptide | sed 's/\*//g' | cut -f2 -d \.  > $p2.tmp.sequence
 	for p3 in $(cat $p2.tmp.sequence | sort | uniq )
 	do
@@ -48,7 +47,6 @@ do
 	do
 	    grep "^$p3 " $p2.tmp.uniq.mass | awk '{print $2}'
 	done > $p2.tmp.mass
-	##cat $p2.tagged | grep $p1 | sed 's/IPI://g' | awk '{print $6}' > $p2.tmp.mass
 	cat $p2.tmp.FileName | awk -F "." '{print $1}' | awk -F "_" '{print $NF}' > $p2.tmp.segment
 	cat $p2.tmp.FileName | awk -F "." '{print $2}'  > $p2.tmp.scan
 	cat $p2.tmp.FileName | awk -F "." '{print $NF}' > $p2.tmp.charge
@@ -56,8 +54,9 @@ do
 	paste -d":" $p2.tmp.ipi $p2.tmp.peptide $p2.tmp.charge $p2.tmp.segment > $p2.tmp.key
 	paste -d " " $p2.tmp.run $p2.tmp.scan $p2.tmp.mass $p2.tmp.xcorr $p2.tmp.key >> tmp.key_scan
 	rm -rf $p2.tmp.*
-	cat $p2.tagged | grep Gene_Symbol | sed 's/IPI://g' | awk '{print $1} '| awk -F"|" '{print $1}'> tmp.ipi
-	cat $p2.tagged | grep Gene_Symbol | sed 's/IPI://g' | cut -f3 -d"=" | cut -c1-50 | sed -e s/^\-/_/g > tmp.name
+	cat $p2.tagged | grep ^cimageipi | sed 's/^cimageipi\-//g' | sed 's/IPI://g' | awk '{print $1} '| awk -F"|" '{print $1}'> tmp.ipi
+	## name deliminator "Gene_Symbol=" or "Full="
+	cat $p2.tagged | grep ^cimageipi | awk -F"l=" '{print $NF}'| cut -c1-50 | sed -e s/^\-/_/g > tmp.name
 	paste tmp.ipi tmp.name >> tmp.ipi_name
     done
 done
