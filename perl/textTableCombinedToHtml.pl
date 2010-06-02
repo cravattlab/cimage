@@ -99,9 +99,17 @@ for ($i=1; $i<$nrow; ++$i) {
 	$_ = $line[$j];
 	if ( /^=HYPERLINK/ ) {
 	    /^=HYPERLINK\("(.*)","(\d+.\d+)"\)$/;
-	    print OUTFILE "<TD><A HREF=\"$1\">$2</A>";
+	    print OUTFILE "<TD $bgcolormap[$j]><A HREF=\"$1\">$2</A>";
 	} elsif ( /^([a-zA-Z]+)$/ && $anchor1 ) {
 	    print OUTFILE "<TD $bgcolormap[$j]> <A NAME=\"$1\"></A> $bold1 $1 $bold2";
+	} elsif ( /(\w+)$/ && $j==1 ) {
+	    if (/(IPI\w+)/) {
+		print OUTFILE "<TD $bgcolormap[$j]><A HREF=\"http://www.ebi.ac.uk/cgi-bin/dbfetch?db=IPI&id=$1&format=default\">$1</A>";
+	    } elsif (/^(\w{6})$/) {
+		print OUTFILE "<TD $bgcolormap[$j]><A HREF=\"http://www.uniprot.org/uniprot/$1\">$1</A>";
+	    } else {
+		print OUTFILE "<TD $bgcolormap[$j]> $bold1 $line[$j] $bold2";
+	    }
 	} else {
 	    print OUTFILE "<TD $bgcolormap[$j]> $bold1 $line[$j] $bold2";
 	}
