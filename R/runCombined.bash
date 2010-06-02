@@ -22,6 +22,11 @@ do
 done
 dirs=$(echo $allpt | sed "s/$txt//g")
 
+nchar=$(echo $outname | wc -c)
+if [ "$nchar" -gt 20 ]; then
+    outname="combine_all"
+fi
+
 if [ "$by_protein" == "by_protein" ]; then
     R --vanilla --args $txt $dirs < /home/chuwang/svnrepos/R/combined_by_protein.R > $outname.by_protein.Rout
 else
