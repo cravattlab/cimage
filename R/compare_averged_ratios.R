@@ -11,7 +11,7 @@ table <- as.list(ratio.files)
 all.uniq <- NULL
 sp=" "
 for (i in 1:nset ) {
-  tmp.table <- read.table(ratio.files[i], header=T,sep="\t",quote="")
+  tmp.table <- read.table(ratio.files[i], header=T,sep="\t",quote="",as.is=T)
   for (j in 1:nrow(tmp.table)) {
     if ( ! is.na(tmp.table[j,"index"]) ) {
       tmp.table[j,"ipi"] = tmp.table[j+1,"ipi"]
@@ -36,8 +36,8 @@ for (i in 1:nset ) {
 count <- 0
 link.list <- as.list( levels(as.factor(all.uniq) ) )
 nuniq <- length(link.list)
-out.num.matrix <- matrix(NA, nrow=nuniq,ncol=1*nset)
-colnames(out.num.matrix) <- output.cols
+out.num.matrix <- matrix(NA, nrow=nuniq,ncol=2*nset)
+colnames(out.num.matrix) <- c(output.cols,paste(output.cols,"sd",sep="."))
 char.names <- c("index","ipi", "description", "symbol", "sequence")
 out.char.matrix <- matrix(" ",nrow=nuniq,ncol=length(char.names))
 colnames(out.char.matrix) <- char.names
@@ -53,18 +53,21 @@ for (uniq in levels(as.factor(all.uniq) ) ) {
   for ( i in 1:nset ) {
     match <- table[[i]][,"uniq"] == uniq
     if ( sum(match) == 1 ) {
-      ratio <- table[[i]][match,input.cols[i]]
+      ratio <- table[[i]][match,paste("mr",input.cols[i],sep=".")]
+      sd <- table[[i]][match,paste("sd",input.cols[i],sep=".")]
       if (ratio > 0.0) {
         out.num.matrix[count,i] <- ratio
+        out.num.matrix[count,i+nset] <- sd
       } else {
         out.num.matrix[count,i] <- NA
+        out.num.matrix[count,i+nset] <- NA
       }
     }
   }
 }
 
 ## order by ratio from last set to first set
-z.order <- do.call("order",c(data.frame(out.num.matrix[,seq(1,nset)]), na.last=T))
+z.order <- do.call("order",c(data.frame(out.num.matrix[,seq(1,2*nset)]), na.last=T))
 
 html.table <- cbind(out.char.matrix,out.num.matrix)[z.order,]
 
@@ -76,7 +79,7 @@ write.table(html.table, file=paste("compare_averaged_ratios",paste(output.cols,s
 
 library(limma)
 png(paste("compare_averaged_ratios_vennDiagram",paste(output.cols,sep="",collapse="_"),"png",sep="."))
-venn.out.matrix <- ! is.na(out.num.matrix)
+venn.out.matrix <- ! is.na(out.num.matrix[,1:nset])
 vc <- vennCounts(venn.out.matrix)
 vennDiagram(vc,main="Number of peptides with valid ratios",counts.col="red")
 dev.off()
