@@ -14,8 +14,12 @@ rt.cut <- 10.0
 # ppm
 mz.ppm.cut <- 0.000025 # 25ppm
 # From Eranthie's isotopically labeled probe
-pair.mass.delta <- 6.01381
-# From jsc's isotopically labeled probe
+##pair.mass.delta <- 6.01381
+# From Sussana's silac data
+pair.mass.delta <- 10.0082
+##from Brent's metabolite data
+##pair.mass.delta <- 4.0017
+## From jsc's isotopically labeled probe
 ##pair.mass.delta <- 1.0033548*7
 # nature mass difference between C12 and C13
 isotope.mass.unit <- 1.0033548
