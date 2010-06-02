@@ -2,6 +2,15 @@ args <- commandArgs(trailingOnly=T)
 ### I/O options ###
 folder1 <- args[1]
 folder2 <- args[2]
+
+args <- commandArgs(trailingOnly=T)
+if(length(args) >= 2) {
+  folder1 <- args[1]
+  folder2 <- args[2]
+}
+cat(folder1)
+cat(folder2)
+
 result <- "results"
 ###################
 library(xcms)
