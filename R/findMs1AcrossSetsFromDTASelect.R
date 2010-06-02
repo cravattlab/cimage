@@ -2,9 +2,10 @@ library(xcms)
 source("/home/chuwang/svnrepos/R/msisotope.R")
 
 ## probe's mass added to peptide
-probe.mass <- c(464.28596,15.99940,79.96630,79.96630,548.3435,464.2860,464.2860,464.2860)
+#probe.mass <- c(464.28596,15.99940,79.96630,79.96630,548.3435,464.2860,464.2860,464.2860,15.99940)
+probe.mass <- c(464.28596,15.99940,79.96630,79.96630,196.1212,464.2860,464.2860,79.96630,15.99940)
 ## TYR phosphorylation , 79.96630)
-names(probe.mass) <- c("C","M","S","T","K","D","E","Y")
+names(probe.mass) <- c("C","M","S","T","K","D","E","Y","P")
 ## 10 ppm to extract chromatographic peaks
 mz.ppm.cut <- 0.000010
 # From Eranthie's isotopically labeled probe
