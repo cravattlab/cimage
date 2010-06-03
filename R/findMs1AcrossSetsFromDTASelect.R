@@ -1,38 +1,36 @@
 library(xcms)
+source("/home/chuwang/svnrepos/R/inputparams.R")
 source("/home/chuwang/svnrepos/R/msisotope.R")
-
-## probe's mass added to peptide
-#probe.mass <- c(464.28596,15.99940,79.96630,79.96630,548.3435,464.2860,464.2860,464.2860,15.99940)
-probe.mass <- c(464.28596,15.99940,79.96630,79.96630,196.1212,464.2860,464.2860,79.96630,15.99940)
-## TYR phosphorylation , 79.96630)
-names(probe.mass) <- c("C","M","S","T","K","D","E","Y","P")
-## 10 ppm to extract chromatographic peaks
-mz.ppm.cut <- 0.000010
-# From Eranthie's isotopically labeled probe
-pair.mass.delta <- 6.01381
-# From Justin's SILAC exp
-silac.mass.delta <- c( 8.0142, 10.0082,6.0138,7.0172)
-silac.num.N15 <- c(2,4,1,1)
-silac.num.C13 <- c(6,6,5,6)
-names(silac.mass.delta) <- c("K","R","V","L")
-names(silac.num.N15) <- c("K","R","V","L")
-names(silac.num.C13) <- c("K","R","V","L")
-# nature mass difference between C12 and C13
-isotope.mass.unit <- 1.0033548
-# natural mass difference between N14 and N15
-isotope.mass.unit.N15 <- 0.997035
-mass.shift <- round( pair.mass.delta/isotope.mass.unit )
-# mass of a proton
-Hplus.mass <- 1.0072765
 
 ## file name from input args
 args <- commandArgs(trailingOnly=T)
-silac=""
-if ( substr(args[1],1,5) == "silac" ) {
-  silac <- args[1]
-  args <- args[-1]
-}
-output.path <- "output"
+param.file <- args[1]
+args <- args[-1]
+
+## read parameters from a file
+params <- read.input.params(param.file)
+
+
+## initialize atom mass table
+atom.mass.vec <- init.atom.mass()
+## initialize chemical composition table
+light.chem.table <- read.chem.table(params[["light.chem.table"]])
+heavy.chem.table <- read.chem.table(params[["heavy.chem.table"]])
+## initialize amino acid mass table
+light.aa.mass <- init.aa.mass(atom.mass.vec, light.chem.table)
+heavy.aa.mass <- init.aa.mass(atom.mass.vec, heavy.chem.table)
+
+## ppm to extract chromatographic peaks
+mz.ppm.cut <- as.numeric(params[["ppm_tolerance"]]) * 1E-6
+## nature mass difference between C12 and C13
+isotope.mass.unit <- atom.mass.vec["C13"] - atom.mass.vec["C"]
+## natural mass difference between N14 and N15
+isotope.mass.unit.N15 <- atom.mass.vec["N15"] - atom.mass.vec["N"]
+# mass of a proton
+Hplus.mass <- atom.mass.vec["Hplus"]
+
+## output folder
+output.path <- params[["output.path"]]
 dir.create(output.path)
 ## the table with protein names
 ipi.name.table <- read.table("ipi_name.table",sep="\t",header=T)
@@ -69,20 +67,24 @@ for (name in mzXML.names) {
   cat(paste(name,"\n",sep=""))
   mzXML.files[[name]] <- xcmsRaw( paste("../",name,sep=""), profstep=0, includeMSn=T)
 }
-##}
-##special case for raw file corruption
-##ex2 <- mzXML.files[[2]]
-##new.ex2 <- readFileFromMsn( ex2 )
-##mzXML.files[[2]] <- new.ex2
-##
 
-## retention time window in secs
-rt.window <- 10
+## more parameters from input files
+## retention time window for alignment across multiple samples
+rt.window <- as.numeric(params[["rt.window"]])
 rt.window.width <- rt.window * 60
-local.rt.window <- 2
+## local retention time window for noise line calculation
+local.rt.window <- as.numeric(params[["local.rt.window"]])
 local.rt.window.width <- local.rt.window * 60
 ## signal/noise ratio for peak picking
-sn <- 2.5
+sn <- as.numeric(params[["sn"]])
+### range cutoff for calculated ratios###
+ratio.range <- as.numeric(params[["ratio.range"]])
+### isotope envelope score cutoff ###
+env.score.cutoff <- as.numeric(params[["env.score.cutoff"]])
+### coelution profile r2 cutoff ###
+r2.cutoff <- as.numeric(params[["r2.cutoff"]])
+### minimum peak width in numbers of time points###
+minimum.peak.points <- as.numeric(params[["minimum.peak.points"]])
 
 ## column names for calculated ratios
 integrated.area.ratio <- paste("IR",cross.vec,sep=".")
@@ -94,16 +96,11 @@ column.names <- c("index","ipi", "description", "symbol", "sequence", "mass", "c
 out.df <- matrix(nrow=0, ncol=length(column.names))
 colnames(out.df) <- column.names
 
-## output layout
+## output name
 out.filename.base <- paste("output_rt_",as.character(rt.window),"_sn_",
                       as.character(sn),sep="")
 out.filename <- paste(output.path,"/",out.filename.base,".pdf",sep="")
-out.filename.r2 <- paste(output.path,"/",out.filename.base,".pdf",sep="")
-horiz.layout <- F
-if (ncross < 3) {
-  horiz.layout <- T
-}
-
+## output layout
 pdf( out.filename, height=4*ncross, width=11, paper="special")
 layout.vec <- row.layout.vec <- c(1,1,2,1,1,3)
 if ( ncross > 1 ) {
@@ -127,39 +124,22 @@ for ( i in 1:dim(cross.table)[1] ) {
   entry.index <- which( entry.tag == entry.levels )
   description <- as.character(ipi.name.table[ipi,"name"])
   symbol<- strsplit(description, " ")[[1]][1]
-  peptide.vec <- unlist( strsplit(peptide,".",fixed=T) )
-  peptide.vec <- unlist( strsplit(peptide.vec[2],"",fixed=T) )
-  nmod <- length(which(peptide.vec=="*"))
-  modified.mass <- sum( probe.mass[peptide.vec[which(peptide.vec=="*")-1]] )
-  mono.mass  <- cross.table[i,"mass"]+modified.mass
+  ## momo.mass (light and heavy) and mass of most abundant isotopes (light and heavy)
+  mono.mass <- calc.peptide.mass( peptide, light.aa.mass)
   predicted.dist <- isotope.dist( averagine.count(mono.mass) )
   mass <- mono.mass + (which.max(predicted.dist) - 1)*isotope.mass.unit
-  raw.scan.num <- cross.table[i,cross.vec]
-  ##
+  mono.mass.heavy <- calc.peptide.mass( peptide, heavy.aa.mass)
+  mass.heavy <- mono.mass.heavy + mass - mono.mass
+  ## mass delta between light and heavy
+  pair.mass.delta <- mono.mass.heavy - mono.mass
+  mass.shift <- round( pair.mass.delta/isotope.mass.unit )
   ## mz
-  mono.mz.heavy <- mono.mz <- mono.mass/charge + Hplus.mass
+  mono.mz <- mono.mass/charge + Hplus.mass
   mz.light <- mass/charge + Hplus.mass
-  if ( silac == "silac" ) {
-    n.lys <- length(which(peptide.vec=="K"))
-    n.arg <- length(which(peptide.vec=="R"))
-    pair.mass.delta <- n.lys*silac.mass.delta["K"]+n.arg*silac.mass.delta["R"]
-    ##pair.mass.delta <- n.lys*silac.mass.delta["K"]+n.val*silac.mass.delta["V"]+n.leu*silac.mass.delta["L"]
-    mz.heavy <- (mass+pair.mass.delta)/charge + Hplus.mass
-    mass.shift <- round( pair.mass.delta/isotope.mass.unit )
-    mono.mz.heavy <- (mono.mass + pair.mass.delta)/charge + Hplus.mass
-  } else if ( silac == "silac2" ) {
-    n.lys <- length(which(peptide.vec=="K"))
-    n.leu <- length(which(peptide.vec=="L"))
-    n.val <- length(which(peptide.vec=="V"))
-    pair.mass.delta <- n.lys*silac.mass.delta["K"]+n.val*silac.mass.delta["V"]+n.leu*silac.mass.delta["L"]
-    mz.heavy <- (mass+pair.mass.delta)/charge + Hplus.mass
-    mass.shift <- round( pair.mass.delta/isotope.mass.unit )
-    mono.mz.heavy <- (mono.mass + pair.mass.delta)/charge + Hplus.mass
-  } else {
-    mz.heavy <- (mass+nmod*pair.mass.delta)/charge + Hplus.mass
-    mono.mz.heavy <- (mono.mass + nmod*pair.mass.delta)/charge + Hplus.mass
-  }
+  mono.mz.heavy <- mono.mass.heavy/charge + Hplus.mass
+  mz.heavy <-  mass.heavy/charge + Hplus.mass
   ## scan number
+  raw.scan.num <- cross.table[i,cross.vec]
   ms1.scan.rt <- ms1.scan.num <- exist.index <- which( raw.scan.num > 0 )
   for ( k in 1:length(exist.index) ) {
     kk <- exist.index[k]
@@ -303,10 +283,10 @@ for ( i in 1:dim(cross.table)[1] ) {
         ##yes2 <- light.yes > noise.light & heavy.yes > noise.heavy
         ##light.yes <- light.yes[yes2]
         ##heavy.yes <- heavy.yes[yes2]
-        ##if (silac=="" && (ratio > 15 | ratio <0.4)) next
-        if (mono.check < 0.80) next
+        if (ratio > ratio.range[2] | ratio < ratio.range[1]) next
+        if (mono.check < env.score.cutoff) next
         npoints <- length(light.yes)
-        if (npoints<3) {
+        if (npoints<minimum.peak.points) {
           next
         }
         ## extra information for better filtering
@@ -315,7 +295,7 @@ for ( i in 1:dim(cross.table)[1] ) {
         }
         x.lm <- lsfit( x=heavy.yes, y=light.yes,intercept=F )
         r2 <- round(as.numeric(ls.print(x.lm,print.it=F)$summary[1,2]),digits=2)
-        if (r2>0.8) {
+        if (r2>r2.cutoff) {
           n.candidate.peaks <- n.candidate.peaks + 1
         }
         if ( !is.na(tag.rt) & tag.rt>=low & tag.rt<=high) {
@@ -437,7 +417,7 @@ dev.off()
 
 all.table <- out.df
 all.table.out <- all.table[F,]
-rsq.cutoff <- 0.8
+rsq.cutoff <- r2.cutoff
 
 ## go from high concentration to low concentration,
 ## first apply R2 cutoff and sort by IR values

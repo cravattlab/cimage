@@ -1,22 +1,15 @@
 #!/bin/bash
 
 if [ $# -lt 1 ]; then
-    echo Usage: $0 [silac] [no_png] set_1 set_2 ...
+    echo Usage: $0 cimage.params set_1 set_2 ...
     exit -1
 fi
-
-silac=$(echo $1 | cut -c1-5)
-if [ "$silac" == "silac" ]; then
-    silac=$1;
-    shift;
-else
-    silac="";
-fi
-
-no_png=$1
-if [ "$no_png" == "no_png" ]; then
-    no_png=$1
-    shift;
+param=$1
+shift;
+if [ ! -f "$param" ];
+then
+    echo cannot find cimage.param file : $param
+    exit -1
 fi
 
 mzxml=$@
@@ -100,7 +93,7 @@ cat tmp.key_scan | awk '{print $NF, $1, $2, $(NF-1)}' >> all_scan.table
 rm -rf tmp.ipi tmp.name tmp.ipi_name tmp.key_scan tmp.seq_mass  *.tmp.scan
 
 echo Running xcms to extract chromatographic peaks
-R --vanilla --args $silac $mzxml < /home/chuwang/svnrepos/R/findMs1AcrossSetsFromDTASelect.R > findMs1AcrossSetsFromDTASelect.Rout
+R --vanilla --args $param $mzxml < /home/chuwang/svnrepos/R/findMs1AcrossSetsFromDTASelect.R > findMs1AcrossSetsFromDTASelect.Rout
 
 echo Generating graphs
 cd output
