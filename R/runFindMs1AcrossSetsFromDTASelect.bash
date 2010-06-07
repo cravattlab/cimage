@@ -19,8 +19,9 @@ echo -n > tmp.key_scan
 echo -n > tmp.seq_mass
 # tagged and fwd
 echo Parsing DTASelect files
-for p1 in $(echo $mzxml | sed 's/\_HL$//g')
+for p11 in $(echo $mzxml)
 do
+    p1=$(echo $p11 | sed 's/_HL$//g')
     echo $p1
     for p2 in $(ls DTASelect-filter_$p1\_[hl]*.txt);
     do
@@ -62,8 +63,9 @@ cat tmp.ipi_name | tr -d '\r' | sort | uniq | sed -e s/\'//g | sed -e s/\"//g | 
 ## table with scans from different dataset
 scanfiles=""
 keys=$(cat tmp.key_scan | awk '{print $NF}' | sort | uniq )
-for p1 in $(echo $mzxml | sed 's/\_HL$//g')
+for p11 in $(echo $mzxml)
 do
+    p1=$(echo $p11 | sed 's/_HL$//g')
     echo $p1 > $p1.tmp.scan
     for key in $keys
     do
