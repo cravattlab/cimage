@@ -23,7 +23,7 @@ for p11 in $(echo $mzxml)
 do
     p1=$(echo $p11 | sed 's/_HL$//g')
     echo $p1
-    for p2 in $(ls DTASelect-filter_$p1\_[hl]*.txt);
+    for p2 in $(ls DTASelect-filter_$p1\_[hlHL]*.txt);
     do
 	HL=$(echo $p2 | sed 's/\.txt$//g' | awk -F "_" '{print $NF}')
 	/home/chuwang/svnrepos/python/tagDTASelect.py $p2 > $p2.tagged;
@@ -50,7 +50,7 @@ do
 	rm -rf $p2.tmp.*
 	cat $p2.tagged | grep ^cimageipi | sed 's/^cimageipi\-//g' | sed 's/IPI://g' | awk '{print $1} '| awk -F"|" '{print $1}'> tmp.ipi
 	## name deliminator "Gene_Symbol=" or "Full="
-	cat $p2.tagged | grep ^cimageipi | awk -F"l=" '{print $NF}'| cut -c1-50 | sed -e s/^\-/_/g > tmp.name
+	cat $p2.tagged | grep ^cimageipi | awk -F "\t" '{print $NF}' | awk -F"l=" '{print $NF}'| cut -c1-50 | sed -e s/^\-/_/g > tmp.name
 	paste tmp.ipi tmp.name >> tmp.ipi_name
     done
 done
