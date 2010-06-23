@@ -21,7 +21,9 @@ light.aa.mass <- init.aa.mass(atom.mass.vec, light.chem.table)
 heavy.aa.mass <- init.aa.mass(atom.mass.vec, heavy.chem.table)
 
 ## ppm to extract chromatographic peaks
-mz.ppm.cut <- as.numeric(params[["ppm_tolerance"]]) * 1E-6
+mz.ppm.cut <- as.numeric(params[["ppm.tolerance"]]) * 1E-6
+## N15 enrichment ratio ##
+N15.enrichment <- as.numeric(params[["N15.enrichment"]])
 ## nature mass difference between C12 and C13
 isotope.mass.unit <- atom.mass.vec["C13"] - atom.mass.vec["C"]
 ## natural mass difference between N14 and N15
@@ -112,7 +114,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-##for ( i in 835:850) {
+##for ( i in 1:10) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -126,13 +128,18 @@ for ( i in 1:dim(cross.table)[1] ) {
   symbol<- strsplit(description, " ")[[1]][1]
   ## momo.mass (light and heavy) and mass of most abundant isotopes (light and heavy)
   mono.mass <- calc.peptide.mass( peptide, light.aa.mass)
-  predicted.dist <- isotope.dist( averagine.count(mono.mass) )
-  mass <- mono.mass + (which.max(predicted.dist) - 1)*isotope.mass.unit
+  #predicted.dist <- isotope.dist( averagine.count(mono.mass) )
+  elements.count <- calc.num.elements(peptide, light.chem.table)
+  predicted.dist <- isotope.dist(elements.count)
+  i.max <- which.max(predicted.dist)
+  mass <- mono.mass + (i.max - 1)*isotope.mass.unit
   mono.mass.heavy <- calc.peptide.mass( peptide, heavy.aa.mass)
   mass.heavy <- mono.mass.heavy + mass - mono.mass
+  elements.count.heavy <- calc.num.elements(peptide, heavy.chem.table)
+  predicted.dist.heavy <- isotope.dist(elements.count.heavy,N15.enrichment)
   ## mass delta between light and heavy
-  pair.mass.delta <- mono.mass.heavy - mono.mass
-  mass.shift <- round( pair.mass.delta/isotope.mass.unit )
+  mass.shift <- sum((elements.count.heavy-elements.count)[c("N15","H2","C13")])
+  correction.factor <- predicted.dist[i.max]/predicted.dist.heavy[i.max+mass.shift]
   ## mz
   mono.mz <- mono.mass/charge + Hplus.mass
   mz.light <- mass/charge + Hplus.mass
@@ -271,9 +278,9 @@ for ( i in 1:dim(cross.table)[1] ) {
         mono.check <- checkChargeAndMonoMass( peak.scan, mono.mass, charge, mz.ppm.cut, predicted.dist)
         ## calculate ratio of integrated peak area
         if (HL.ratios[j]) {
-          ratio <- round(sum(heavy.yes)/sum(light.yes),digits=2)
+          ratio <- round((sum(heavy.yes)/sum(light.yes))*correction.factor,digits=2)
         } else {
-          ratio <- round(sum(light.yes)/sum(heavy.yes),digits=2)
+          ratio <- round((sum(light.yes)/sum(heavy.yes))/correction.factor,digits=2)
         }
         lines(c(low,low),ylimit/10, col="green")
         lines(c(high,high),ylimit/10, col="green")
@@ -334,22 +341,36 @@ for ( i in 1:dim(cross.table)[1] ) {
       ##l.ratios[j] <- best.xlm
       r2.v[j] <- best.r2
       ## plot raw spectrum
-      predicted.dist <- predicted.dist[1:20]
+      ##predicted.dist <- predicted.dist[1:20]
+      ## upper limit: heavy + 20units ##
+      cc <- seq(1,max(which(predicted.dist.heavy>0.01)))
       if (HL.ratios[j]) {
-        predicted.dist.merge <- (1/best.ratio)*c(predicted.dist, rep(0,mass.shift)) + c(rep(0,mass.shift),predicted.dist)
+        predicted.dist.merge <- (1/best.ratio)*predicted.dist[cc] + predicted.dist.heavy[cc]
       } else {
-        predicted.dist.merge <- (best.ratio)*c(predicted.dist, rep(0,mass.shift)) + c(rep(0,mass.shift),predicted.dist)
+        predicted.dist.merge <- (best.ratio)*predicted.dist[cc] + predicted.dist.heavy[cc]
       }
+
+      mz.unit <- isotope.mass.unit/charge
+      ##predicted.mz <- mono.mz + mz.unit*(seq(1,mass.shift)-1)
+      light.index <- which(predicted.dist>0.01)-1
+      light.index <- light.index[which(light.index<mass.shift)]
+      predicted.mz <- mono.mz + mz.unit*light.index
+      predicted.dist <- predicted.dist.merge[light.index+1]
+      #predicted.mz.heavy <- mono.mz.heavy + mz.unit*(seq(1, length(predicted.dist.merge)-mass.shift)-1)
+      mz.unit.N15 <- isotope.mass.unit.N15/charge
+      heavy.index <- which(predicted.dist.heavy>0.01)
+      predicted.dist.heavy <- predicted.dist.merge[heavy.index]
+      heavy.adjustments <- heavy.index <- heavy.index-mass.shift-1
+      heavy.adjustments[which(heavy.index<0)] <- mz.unit.N15
+      heavy.adjustments[which(heavy.index>=0)] <- mz.unit
+      predicted.mz.heavy <- mono.mz.heavy + heavy.adjustments*heavy.index
+
+      predicted.mz <- c(predicted.mz, predicted.mz.heavy)
+
+      predicted.dist.merge <- c(predicted.dist,predicted.dist.heavy)
       n.max <- which.max(predicted.dist.merge)
       predicted.dist.merge <- predicted.dist.merge/predicted.dist.merge[n.max]
-      mz.unit <- isotope.mass.unit/charge
-      if ( mass.shift > 0 ) {
-        predicted.mz <- mono.mz + mz.unit*(seq(1,mass.shift)-1)
-      } else {
-        predicted.mz <- NULL
-      }
-      predicted.mz.heavy <- mono.mz.heavy + mz.unit*(seq(1, length(predicted.dist.merge)-mass.shift)-1)
-      predicted.mz <- c(predicted.mz, predicted.mz.heavy)
+
       mz.max <- predicted.mz[n.max]
       mass.range <- c(mono.mz-2*mz.unit, mz.heavy+8*mz.unit)
       scan.data <- getScan(xfile, best.peak.scan.num, massrange=mass.range)
@@ -376,16 +397,21 @@ for ( i in 1:dim(cross.table)[1] ) {
       plot(scan.mz, scan.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit, col="gray")
       par(new=T)
       plot(predicted.mz, observed.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit, col="black")
-      par(new=T)
-      plot( predicted.mz, predicted.dist.merge, type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
       if ( mass.shift >0 ){
-        light.n <- seq(1,(mass.shift))
-        heavy.n <- seq((mass.shift+1),2*mass.shift)
+        light.n <- seq(1,length(light.index))##seq(1,(mass.shift))
+        heavy.n <- seq(length(light.index)+1, length(predicted.mz))##seq((mass.shift+1),2*mass.shift)
       } else {
         light.n <- heavy.n <- seq(1,3)
       }
-      points(predicted.mz[light.n],rep(0,length(light.n)), pch=23,col="red",bg="red")
-      points(predicted.mz[heavy.n],rep(0,length(heavy.n)), pch=24,col="blue",bg="blue")
+      par(new=T)
+      plot( predicted.mz[light.n], predicted.dist.merge[light.n], type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
+      par(new=T)
+      plot( predicted.mz[heavy.n], predicted.dist.merge[heavy.n], type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
+
+      points(predicted.mz[light.n],rep(0,length(light.n)), pch=23,col="red",bg="white")
+      points(predicted.mz[heavy.n],rep(0,length(heavy.n)), pch=24,col="blue",bg="white")
+      points(mz.light,0, pch=24,col="red",bg="red")
+      points(mz.heavy,0, pch=24,col="blue",bg="blue")
       title( paste("Scan # ", xfile@acquisitionNum[best.peak.scan.num], " @ ",
                    round(xfile@scantime[best.peak.scan.num]/60,1)," min; NL:",
                    formatC(int.max, digits=2,format="e"), sep = ""))

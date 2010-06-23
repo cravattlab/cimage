@@ -54,10 +54,29 @@ init.aa.mass <- function(atom.mass.vec, chem.table ) {
   return(aa.mass.vec)
 }
 
-calc.peptide.mass <- function(sequence, aa.mass.vec) {
+element.count <- function(sequence.vec, element, chem.table) {
+  ## sequence.vec is a vector of sequence character
+  if ( element %in% colnames(chem.table) ) {
+    count<- 0
+    for ( aa in sequence.vec ) {
+      count<- count + chem.table[aa,element]
+    }
+    count <- count+ chem.table["NTERM",element] + chem.table["CTERM",element]
+    return(count)
+  } else {
+    return(0)
+  }
+}
+
+vectorize.sequence <- function(sequence) {
   ## get rid of flanking residues deliminated by "."
   peptide.vec <- unlist( strsplit(sequence,".",fixed=T) )
   peptide.vec <- unlist( strsplit(peptide.vec[2],"",fixed=T) )
+  return(peptide.vec)
+}
+
+calc.peptide.mass <- function(sequence, aa.mass.vec) {
+  peptide.vec <- vectorize.sequence(sequence)
   mass <- 0
   for ( aa in peptide.vec ) {
     mass <- mass + aa.mass.vec[aa]
@@ -65,3 +84,23 @@ calc.peptide.mass <- function(sequence, aa.mass.vec) {
   mass <- mass + aa.mass.vec["NTERM"] + aa.mass.vec["CTERM"]
   return(mass)
 }
+
+
+calc.num.elements <- function( sequence, chem.table) {
+  peptide.vec <- vectorize.sequence(sequence)
+  elements <- colnames(chem.table)
+  elements.count <- rep(0, length(elements) )
+  names(elements.count) <- elements
+  for ( e in elements) {
+    elements.count[e] <- element.count(peptide.vec, e, chem.table)
+  }
+  return(elements.count)
+}
+
+calc.num.N15 <- function(sequence, chem.table) {
+  peptide.vec <- vectorize.sequence(sequence)
+  num.N15 <- element.count(peptide.vec, "N15", chem.table)
+  return(num.N15)
+}
+
+

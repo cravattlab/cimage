@@ -1,7 +1,9 @@
-isotope.dist <- function(elements.count) {
-  elements <- c( "C", "H", "N", "O", "S" )
-  heavy <- c(1.10, 0.015, 0.37, 0.20, 4.21)/100
+isotope.dist <- function(elements.count, N15.enrichment=1.0) {
+  elements <- c( "C", "H", "O", "N", "S", "P", "N15", "H2", "C13")
+  heavy <- c(1.10, 0.015, 0.20, 0.37, 4.21, 0, 100, 100, 100)/100
   names(heavy) <- elements
+  heavy["N15"] <- N15.enrichment
+
   light <- 1.00 - heavy
   names(elements.count) <- elements
   single.prob <- as.list( elements )
@@ -9,6 +11,7 @@ isotope.dist <- function(elements.count) {
   all.prob <- numeric(0)
   for ( e in elements ) {
     count <- elements.count[e]
+    if (count == 0) next
     v <- seq(0,count)
     l <- light[e]
     h <- heavy[e]

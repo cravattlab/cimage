@@ -2,8 +2,10 @@
 light.chem.table = /home/chuwang/light.IA_tev.table.txt
 !!! heavy chemical composition table !!!
 heavy.chem.table = /home/chuwang/heavy.IA_tev.table.txt
+!!! N15 enrichment percentage !!!
+N15.enrichment = 1.0
 !!! MS1 chromatogram ppm resolution !!!
-ppm_tolerance = 10.0
+ppm.tolerance = 10.0
 !!! retention time window width in minutes!!!
 rt.window = 10
 !!! local retention time window for noise calculation in minutes!!!
