@@ -12,6 +12,8 @@ n.enz <- as.numeric(args[4])
 n.row <- as.numeric(args[5])
 n.col <- as.numeric(args[6])
 
+file.type <- as.character(args[7])
+
 n.empty  <- n.row*n.col-n.enz
 
 out.filename <- paste("PlotJZL",mz.start,"_",mz.end,"_",mz.bin,".ps",sep="")
@@ -19,7 +21,12 @@ mzs <- seq(mz.start, mz.end, by=mz.bin)
 
 ##
 input.path <- getwd()
-mzXML.names <- list.files(path="./",pattern="mzdata.xml$")
+if ( file.type == 'XML' ) {
+  mzXML.names <- list.files(path="./",pattern="mzdata.xml$",ignore.case=T)
+}
+if ( file.type == 'CDF' ) {
+  mzXML.names <- list.files(path="./",pattern="CDF$",ignore.case=T)
+}
 mzXML.files <- as.list( mzXML.names )
 names(mzXML.files) <- mzXML.names
 raw.ECI <- mzXML.files
