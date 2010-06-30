@@ -23,7 +23,7 @@ for p11 in $(echo $mzxml)
 do
     p1=$(echo $p11 | sed 's/_HL$//g')
     echo $p1
-    for p2 in $(ls DTASelect-filter_$p1\_[hlHL]*.txt);
+    for p2 in $(ls DTASelect-filter_$p1\_*.txt);
     do
 	HL=$(echo $p2 | sed 's/\.txt$//g' | awk -F "_" '{print $NF}')
 	/home/chuwang/svnrepos/python/tagDTASelect.py $p2 > $p2.tagged;
