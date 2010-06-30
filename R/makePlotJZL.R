@@ -23,9 +23,11 @@ mzs <- seq(mz.start, mz.end, by=mz.bin)
 input.path <- getwd()
 if ( file.type == 'XML' ) {
   mzXML.names <- list.files(path="./",pattern="mzdata.xml$",ignore.case=T)
+  name.col <- 4
 }
 if ( file.type == 'CDF' ) {
   mzXML.names <- list.files(path="./",pattern="CDF$",ignore.case=T)
+  name.col <- 3
 }
 mzXML.files <- as.list( mzXML.names )
 names(mzXML.files) <- mzXML.names
@@ -34,7 +36,7 @@ for (name in mzXML.names) {
   cat(paste(name,"\n",sep=""))
   mzXML.files[[name]] <- xcmsRaw( paste("./",name,sep=""))
 }
-name.matrix<- matrix(unlist(strsplit(mzXML.names,".",fixed=T)),ncol=4,byrow=T)
+name.matrix<- matrix(unlist(strsplit(mzXML.names,".",fixed=T)),ncol=name.col,byrow=T)
 enz.names <- levels(as.factor(name.matrix[,1]))
 mock <- name.matrix[,1]=="mock"
 mock.exist <- sum(mock) > 0
