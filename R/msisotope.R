@@ -1,5 +1,8 @@
 isotope.dist <- function(elements.count, N15.enrichment=1.0) {
   elements <- c( "C", "H", "O", "N", "S", "P", "N15", "H2", "C13")
+  if ( length(elements.count) < length(elements) ) {
+    elements.count <- c( elements.count, rep(0, length(elements)-length(elements.count)))
+  }
   heavy <- c(1.10, 0.015, 0.20, 0.37, 4.21, 0, 100, 100, 100)/100
   names(heavy) <- elements
   heavy["N15"] <- N15.enrichment
@@ -43,8 +46,8 @@ isotope.dist <- function(elements.count, N15.enrichment=1.0) {
 ## isotope.dist(c(60,13,13,86,2))
 averagine.count <- function(input.mass) {
   averagine.mass <- 111.1254
-  elements <- c( "C", "H", "N", "O", "S" )
-  averagine.comp <- c( 4.9348, 7.7583, 1.3577, 1.4773, 0.0417 )
+  elements <- c( "C", "H", "O", "N", "S" )
+  averagine.comp <- c( 4.9348, 7.7583, 1.4773, 1.3577,0.0417 )
   names(averagine.comp) <- elements
   return( round(averagine.comp*(input.mass/averagine.mass)) )
 }
@@ -55,6 +58,9 @@ find.ms2.triggered <- function(xfile, yfile, predicted.mz, rt.range) {
   ms2.matrix <- matrix(0, nrow=length(ms1.scanNums), ncol=length(predicted.mz) )
   dimnames(ms2.matrix)[[1]] <- as.character(ms1.scanNums)
   dimnames(ms2.matrix)[[2]] <- as.character(predicted.mz)
+  if (dim(yfile)[1] == 0) {
+    return(ms2.matrix)
+  }
   ms2.acq.num.max <- max(xfile@msnAcquisitionNum)
   for (i in 1:dim(ms2.matrix)[1]) {
     ms1.scanNum <- ms1.scanNums[i]

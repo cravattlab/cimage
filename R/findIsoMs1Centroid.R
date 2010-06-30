@@ -1,7 +1,17 @@
 args <- commandArgs(trailingOnly=T)
 
 input.file <- args[1]
+pair.mass.delta <- as.numeric(args[2])
 
+includeMS2 <- T
+if ( sum( args == "no_MS2") > 0 ) {
+  includeMS2 <- F
+}
+
+if ( length(args) < 2 ) {
+  cat("no pair delta mass defined. exit...\n")
+  quit()
+}
 library(xcms)
 source("~/svnrepos/R/msisotope.R")
 #memory.limit(2560) # 2.5G memory maximum
@@ -15,10 +25,10 @@ rt.cut <- 10.0
 mz.ppm.cut <- 0.000025 # 25ppm
 # From Eranthie's isotopically labeled probe
 ##pair.mass.delta <- 6.01381
-# From Sussana's silac data
-pair.mass.delta <- 10.0082
+## From Sussana's silac data
+##pair.mass.delta <- 10.0082
 ##from Brent's metabolite data
-##pair.mass.delta <- 4.0017
+#pair.mass.delta <- 4.0017
 ## From jsc's isotopically labeled probe
 ##pair.mass.delta <- 1.0033548*7
 # nature mass difference between C12 and C13
@@ -44,15 +54,21 @@ output.path <- paste(input.path,"/", input.file.base, "_doublet_peaks/",sep="")
 dir.create(output.path)
 
 filename <- paste(input.path, "/", input.file.base, input.file.suffix, sep="")
-xfile <- xcmsRaw( filename, profstep=0, includeMSn=T )
-## a table of scan number versus parent M/Z of ms2 scans
-yfile <- cbind(xfile@msnAcquisitionNum, xfile@msnRt, xfile@msnScanindex, xfile@msnPrecursorMz)
-dimnames(yfile)[[2]] <- c("num","index","rt","pmz")
-dimnames(yfile)[[1]] <- as.character( xfile@msnAcquisitionNum)
-tfile <- read.table( paste(filename,"scanNum_parentMz",sep="."), header=T)
-yfile[,"pmz"] <- tfile[,"parentMz"][match(yfile[,"num"],tfile[,"scanNum"])]
+if (includeMS2) {
+  xfile <- xcmsRaw( filename, profstep=0, includeMSn=T )
+  ## a table of scan number versus parent M/Z of ms2 scans
+  yfile <- cbind(xfile@msnAcquisitionNum, xfile@msnRt, xfile@msnScanindex, xfile@msnPrecursorMz)
+  dimnames(yfile)[[2]] <- c("num","index","rt","pmz")
+  dimnames(yfile)[[1]] <- as.character( xfile@msnAcquisitionNum)
+  tfile <- read.table( paste(filename,"scanNum_parentMz",sep="."), header=T)
+  yfile[,"pmz"] <- tfile[,"parentMz"][match(yfile[,"num"],tfile[,"scanNum"])]
+} else {
+  xfile <- xcmsRaw( filename, profstep=0, includeMSn=F )
+  ## a table of scan number versus parent M/Z of ms2 scans
+  yfile <- NULL
+}
 
-if ( length(args) >1 & args[2] == "fast" ) {
+if ( length(args) >2 & args[3] == "fast" ) {
   xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=10.0, minptsperpeak=5)
 } else {
   xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=2.0, minptsperpeak=2)
