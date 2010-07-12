@@ -58,7 +58,7 @@ find.ms2.triggered <- function(xfile, yfile, predicted.mz, rt.range) {
   ms2.matrix <- matrix(0, nrow=length(ms1.scanNums), ncol=length(predicted.mz) )
   dimnames(ms2.matrix)[[1]] <- as.character(ms1.scanNums)
   dimnames(ms2.matrix)[[2]] <- as.character(predicted.mz)
-  if (dim(yfile)[1] == 0) {
+  if (is.null(yfile)) {
     return(ms2.matrix)
   }
   ms2.acq.num.max <- max(xfile@msnAcquisitionNum)
