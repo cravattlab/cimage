@@ -114,7 +114,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-##for ( i in 1:10) {
+##for ( i in 1:40) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -353,13 +353,13 @@ for ( i in 1:dim(cross.table)[1] ) {
       mz.unit <- isotope.mass.unit/charge
       ##predicted.mz <- mono.mz + mz.unit*(seq(1,mass.shift)-1)
       light.index <- which(predicted.dist>0.01)-1
-      light.index <- light.index[which(light.index<mass.shift)]
+      light.index <- light.index[which(light.index<=mass.shift)]
       predicted.mz <- mono.mz + mz.unit*light.index
-      predicted.dist <- predicted.dist.merge[light.index+1]
+      predicted.dist.local <- predicted.dist.merge[light.index+1]
       #predicted.mz.heavy <- mono.mz.heavy + mz.unit*(seq(1, length(predicted.dist.merge)-mass.shift)-1)
       mz.unit.N15 <- isotope.mass.unit.N15/charge
       heavy.index <- which(predicted.dist.heavy>0.01)
-      predicted.dist.heavy <- predicted.dist.merge[heavy.index]
+      predicted.dist.heavy.local <- predicted.dist.merge[heavy.index]
       heavy.adjustments <- heavy.index <- heavy.index-mass.shift-1
       heavy.adjustments[which(heavy.index<0)] <- mz.unit.N15
       heavy.adjustments[which(heavy.index>=0)] <- mz.unit
@@ -367,7 +367,7 @@ for ( i in 1:dim(cross.table)[1] ) {
 
       predicted.mz <- c(predicted.mz, predicted.mz.heavy)
 
-      predicted.dist.merge <- c(predicted.dist,predicted.dist.heavy)
+      predicted.dist.merge <- c(predicted.dist.local,predicted.dist.heavy.local)
       n.max <- which.max(predicted.dist.merge)
       predicted.dist.merge <- predicted.dist.merge/predicted.dist.merge[n.max]
 
