@@ -68,10 +68,18 @@ if (includeMS2) {
   yfile <- NULL
 }
 
-if ( length(args) >2 & args[3] == "fast" ) {
-  xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=10.0, minptsperpeak=5)
+out.filename0 <- paste(output.path, output.file.base, ".xcms_peaks.txt", sep="")
+## read exisiting peaks table if there
+if (file.exists(out.filename0)) {
+  cat("read existing xcms_peaks table...\n")
+  xpeaks <- read.table(out.filename0,header=T)
 } else {
-  xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=2.0, minptsperpeak=2)
+  cat("call xcms to detect chromatographic peaks...\n")
+  if ( length(args) >2 & args[3] == "fast" ) {
+    xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=10.0, minptsperpeak=5)
+  } else {
+    xpeaks <- findPeaks(xfile,method="centWave", ppm=5, snthresh=2.0, minptsperpeak=2)
+  }
 }
 ## sort the matrix by retention time first
 xpeaks.save <- xpeaks
@@ -82,148 +90,153 @@ num.peaks <- dim(xpeaks)[1]
 rownames(xpeaks) <- seq(1, num.peaks)
 
 ## table with raw pair peak index, charge, rt and hit.id etc
-out.filename0 <- paste(output.path, output.file.base, ".xcms_peaks.txt", sep="")
 write.table( format(xpeaks,digits=10), out.filename0, quote=FALSE, row.names=FALSE)
 
 ## make a fresh empty list
-n.nonredundant.hit <- 0
-pair.list <- data.frame(idx1=numeric(0),idx2=numeric(0),charge=numeric(0),
-                        mz1=numeric(0), mz2=numeric(0),
-                        rt1=numeric(0), rt2=numeric(0), hit.id=numeric(0) )
+out.filename0 <- paste(output.path, output.file.base, ".pair_index.txt", sep="")
+if (file.exists(out.filename0)) {
+  cat("read existing peak_pair table...\n")
+  pair.list <- read.table(out.filename0,header=T)
+} else {
+  n.nonredundant.hit <- 0
+  pair.list <- data.frame(idx1=numeric(0),idx2=numeric(0),charge=numeric(0),
+                          mz1=numeric(0), mz2=numeric(0),
+                          rt1=numeric(0), rt2=numeric(0), hit.id=numeric(0) )
 
-rt.list <- levels(factor(xpeaks[,"rt"]))
-cat( paste("detect isotopic peak pairs in", length(rt.list), "rt windows in total\n") )
-for ( rt.i in 1:length(rt.list) ) {
-  cat(".")
-  if (rt.i%%100 == 0) cat(rt.i)
-  rt <- rt.list[rt.i]
-  rt.range <- c( as.numeric(rt)-rt.cut, as.numeric(rt)+rt.cut)
-  this.rt <- (xpeaks[,"rt"] > rt.range[1]) & (xpeaks[,"rt"] < rt.range[2] )
-  #this.rt <- factor(xpeaks[,"rt"])==rt
-  if ( sum(this.rt) <= 1 ) next
-  ## get all peaks with this retension time and sort by mz
-  xpeaks.this.rt <- xpeaks[this.rt,]
-  xpeaks.this.rt <- xpeaks.this.rt[order(xpeaks.this.rt[,"mz"]), ]
-  mz.this.rt <- xpeaks.this.rt[,"mz"]
-  num.mz.this.rt <- length( mz.this.rt )
-  mz.delta <- matrix(0, num.mz.this.rt, num.mz.this.rt,
-                     dimnames=list(names(mz.this.rt), names(mz.this.rt) ) )
-  mz.delta.ppm <- mz.delta # tolerance matrix
+  rt.list <- levels(factor(xpeaks[,"rt"]))
+  cat( paste("detect isotopic peak pairs in", length(rt.list), "rt windows in total\n") )
+  for ( rt.i in 1:length(rt.list) ) {
+    cat(".")
+    if (rt.i%%100 == 0) cat(rt.i)
+    rt <- rt.list[rt.i]
+    rt.range <- c( as.numeric(rt)-rt.cut, as.numeric(rt)+rt.cut)
+    this.rt <- (xpeaks[,"rt"] > rt.range[1]) & (xpeaks[,"rt"] < rt.range[2] )
+                                        #this.rt <- factor(xpeaks[,"rt"])==rt
+    if ( sum(this.rt) <= 1 ) next
+    ## get all peaks with this retension time and sort by mz
+    xpeaks.this.rt <- xpeaks[this.rt,]
+    xpeaks.this.rt <- xpeaks.this.rt[order(xpeaks.this.rt[,"mz"]), ]
+    mz.this.rt <- xpeaks.this.rt[,"mz"]
+    num.mz.this.rt <- length( mz.this.rt )
+    mz.delta <- matrix(0, num.mz.this.rt, num.mz.this.rt,
+                       dimnames=list(names(mz.this.rt), names(mz.this.rt) ) )
+    mz.delta.ppm <- mz.delta # tolerance matrix
 
-  # for redundancy check
-  # pair.list.prev.rt contains all existing pairs
-  # which could potentially overlap with the current rt window
-  pair.list.prev.rt <- pair.list[ (pair.list[,"rt1"] >= rt.range[1] | pair.list[,"rt2"] >= rt.range[1] ), ]
+    ## for redundancy check
+    ## pair.list.prev.rt contains all existing pairs
+    ## which could potentially overlap with the current rt window
+    pair.list.prev.rt <- pair.list[ (pair.list[,"rt1"] >= rt.range[1] | pair.list[,"rt2"] >= rt.range[1] ), ]
 
-  for (i in 1:num.mz.this.rt ) {
-    for ( j in i:num.mz.this.rt ) {
-      mz.delta[i,j] <- mz.delta[j,i] <- abs(mz.this.rt[i] - mz.this.rt[j])
-      mz.delta.ppm[i,j] <- mz.delta.ppm[j,i]  <- mz.ppm.cut * ( mz.this.rt[i]+mz.this.rt[j] ) / 2.0
-    }
-  }
-  for (charge in charge.states) {
-    pair.list.this.charge <- pair.list[F,] # an empty dataframe tracking pairs within this rt and charge
-    n.hit.this.charge <- 0
-    pair.mz.delta <- pair.mass.delta / charge
-    mz.delta.pass <- abs(mz.delta - pair.mz.delta) < mz.delta.ppm
     for (i in 1:num.mz.this.rt ) {
       for ( j in i:num.mz.this.rt ) {
-        if ( mz.delta.pass[i,j] ) {
-                                        # earlier sorting by mz ensures that 1 is alway lighter peak
-          peak.index1 <- dimnames(mz.delta.pass)[[1]][i]
-          peak.index2 <- dimnames(mz.delta.pass)[[2]][j]
-                                        # check proper isotopic distribution given this charge
-                                        # simple criteria -- for each of light and heavy peaks,
-                                        # there is at least one isotopic peak nearby
-          isotope.mz.delta <- isotope.mass.unit / charge
-          isotope.delta.pass <- abs(mz.delta - isotope.mz.delta) < mz.delta.ppm
-          if ( (sum(isotope.delta.pass[i,]) == 0) | (sum(isotope.delta.pass[,j]) == 0) ) next
-                                        # mz
-          peak.mz1 <- xpeaks[peak.index1, "mz"]
-          peak.mz2 <- xpeaks[peak.index2, "mz"]
-                                        # intensity
-          peak.maxo1 <- xpeaks[peak.index1, intensity.tag]
-          peak.maxo2 <- xpeaks[peak.index2, intensity.tag]
-                                        # retension time
-          peak.rt1 <- xpeaks[peak.index1, "rt"]
-          peak.rt2 <- xpeaks[peak.index2, "rt"]
-                                        # check peak intensity ratio to fall in certain range
-          ratio <- peak.maxo1 / peak.maxo2
-          if ( ratio < intensity.ratio.range[1] | ratio > intensity.ratio.range[2] ) next
+        mz.delta[i,j] <- mz.delta[j,i] <- abs(mz.this.rt[i] - mz.this.rt[j])
+        mz.delta.ppm[i,j] <- mz.delta.ppm[j,i]  <- mz.ppm.cut * ( mz.this.rt[i]+mz.this.rt[j] ) / 2.0
+      }
+    }
+    for (charge in charge.states) {
+      pair.list.this.charge <- pair.list[F,] # an empty dataframe tracking pairs within this rt and charge
+      n.hit.this.charge <- 0
+      pair.mz.delta <- pair.mass.delta / charge
+      mz.delta.pass <- abs(mz.delta - pair.mz.delta) < mz.delta.ppm
+      for (i in 1:num.mz.this.rt ) {
+        for ( j in i:num.mz.this.rt ) {
+          if ( mz.delta.pass[i,j] ) {
+            ## earlier sorting by mz ensures that 1 is alway lighter peak
+            peak.index1 <- dimnames(mz.delta.pass)[[1]][i]
+            peak.index2 <- dimnames(mz.delta.pass)[[2]][j]
+            ## check proper isotopic distribution given this charge
+            ## simple criteria -- for each of light and heavy peaks,
+            ## there is at least one isotopic peak nearby
+            isotope.mz.delta <- isotope.mass.unit / charge
+            isotope.delta.pass <- abs(mz.delta - isotope.mz.delta) < mz.delta.ppm
+            if ( (sum(isotope.delta.pass[i,]) == 0) | (sum(isotope.delta.pass[,j]) == 0) ) next
+            ## mz
+            peak.mz1 <- xpeaks[peak.index1, "mz"]
+            peak.mz2 <- xpeaks[peak.index2, "mz"]
+            ## intensity
+            peak.maxo1 <- xpeaks[peak.index1, intensity.tag]
+            peak.maxo2 <- xpeaks[peak.index2, intensity.tag]
+            ## retension time
+            peak.rt1 <- xpeaks[peak.index1, "rt"]
+            peak.rt2 <- xpeaks[peak.index2, "rt"]
+            ## check peak intensity ratio to fall in certain range
+            ratio <- peak.maxo1 / peak.maxo2
+            if ( ratio < intensity.ratio.range[1] | ratio > intensity.ratio.range[2] ) next
 
-          # check whether the exact peak pair has been found in previous rt window before
-          redundant <- FALSE
-          if ( dim(pair.list.prev.rt)[1] > 0 ) {
-            for (k in 1:dim(pair.list.prev.rt)[1] ) {
-              if ((pair.list.prev.rt[k,"idx1"] == peak.index1) &&
-                  (pair.list.prev.rt[k,"idx2"] == peak.index2) &&
+            ## check whether the exact peak pair has been found in previous rt window before
+            redundant <- FALSE
+            if ( dim(pair.list.prev.rt)[1] > 0 ) {
+              for (k in 1:dim(pair.list.prev.rt)[1] ) {
+                if ((pair.list.prev.rt[k,"idx1"] == peak.index1) &&
+                    (pair.list.prev.rt[k,"idx2"] == peak.index2) &&
                   (pair.list.prev.rt[k,"charge"] == charge ) ) {
-                redundant <- TRUE
-                break
+                  redundant <- TRUE
+                  break
+                }
               }
             }
-          }
-          if ( redundant ) next
+            if ( redundant ) next
 
-          # this pair is uniq, but maybe it belongs an existing isotope envelope pair
-          # the last digit is used to track unique isotope envelope pairs
-          new.pair <- pair.list.this.charge[F,]
-          #new.pair[1,] <- c( peak.index1, peak.index2, charge, max(peak.rt1, peak.rt2), 0 )
-          new.pair[1,] <- c( peak.index1, peak.index2, charge, peak.mz1, peak.mz2, peak.rt1, peak.rt2, 0 )
-          nrow.this.charge <- dim(pair.list.this.charge)[1]
-          if ( nrow.this.charge == 0 ) {
-            n.hit.this.charge <- n.hit.this.charge + 1
-            new.pair[1,"hit.id"] <- n.hit.this.charge
-            pair.list.this.charge <- rbind( pair.list.this.charge, new.pair )
-          } else {
-            for ( k in 1:nrow.this.charge) {
-              tmp.mz1 <- xpeaks[ pair.list.this.charge[k,"idx1"], "mz" ]
-              tmp.mz2 <- xpeaks[ pair.list.this.charge[k,"idx2"], "mz" ]
-              if (((tmp.mz2>peak.mz1)&(tmp.mz2<peak.mz2)) |
-                  ((tmp.mz1>peak.mz1)&(tmp.mz1<peak.mz2)) ) {
-                # this pair is from an existing isotopic envelope,
-                new.pair[1,"hit.id"] <- pair.list.this.charge[k,"hit.id"]
-                break
-              }
-            }
-            # this pair belongs to a new pair of isotopic envelopes
-            if ( new.pair[1,"hit.id"] == 0 ) {
+            ## this pair is uniq, but maybe it belongs an existing isotope envelope pair
+            ## the last digit is used to track unique isotope envelope pairs
+            new.pair <- pair.list.this.charge[F,]
+            ##new.pair[1,] <- c( peak.index1, peak.index2, charge, max(peak.rt1, peak.rt2), 0 )
+            new.pair[1,] <- c( peak.index1, peak.index2, charge, peak.mz1, peak.mz2, peak.rt1, peak.rt2, 0 )
+            nrow.this.charge <- dim(pair.list.this.charge)[1]
+            if ( nrow.this.charge == 0 ) {
               n.hit.this.charge <- n.hit.this.charge + 1
-              new.pair[1,"hit.id"] = n.hit.this.charge
+              new.pair[1,"hit.id"] <- n.hit.this.charge
+              pair.list.this.charge <- rbind( pair.list.this.charge, new.pair )
+            } else {
+              for ( k in 1:nrow.this.charge) {
+                tmp.mz1 <- xpeaks[ pair.list.this.charge[k,"idx1"], "mz" ]
+                tmp.mz2 <- xpeaks[ pair.list.this.charge[k,"idx2"], "mz" ]
+                if (((tmp.mz2>peak.mz1)&(tmp.mz2<peak.mz2)) |
+                    ((tmp.mz1>peak.mz1)&(tmp.mz1<peak.mz2)) ) {
+                  ## this pair is from an existing isotopic envelope,
+                  new.pair[1,"hit.id"] <- pair.list.this.charge[k,"hit.id"]
+                  break
+                }
+              }
+              ## this pair belongs to a new pair of isotopic envelopes
+              if ( new.pair[1,"hit.id"] == 0 ) {
+                n.hit.this.charge <- n.hit.this.charge + 1
+                new.pair[1,"hit.id"] = n.hit.this.charge
+              }
+              ## add this pair to the list
+              pair.list.this.charge <- rbind( pair.list.this.charge, new.pair )
             }
-            # add this pair to the list
-            pair.list.this.charge <- rbind( pair.list.this.charge, new.pair )
           }
         }
       }
-    }
-    if (n.hit.this.charge == 0) next
-    pair.list.tmp <- pair.list.this.charge[F,]
-    for( k in 1:n.hit.this.charge ) {
-      pair.list.tmp <- pair.list.this.charge[pair.list.this.charge[,"hit.id"] == k, ]
-      rt.factor <- factor( c(pair.list.tmp$rt1,pair.list.tmp$rt2) )
-      rt.levels <- levels(rt.factor)
-      main.rt <- rt.levels[ order(table(rt.factor),rev(rt.levels))[length(rt.levels)] ]
-      if ( main.rt == rt ) {
-        n.nonredundant.hit <- n.nonredundant.hit + 1
-        pair.list.tmp[,"hit.id"] <- n.nonredundant.hit
-        pair.list<- rbind( pair.list, pair.list.tmp )
+      if (n.hit.this.charge == 0) next
+      pair.list.tmp <- pair.list.this.charge[F,]
+      for( k in 1:n.hit.this.charge ) {
+        pair.list.tmp <- pair.list.this.charge[pair.list.this.charge[,"hit.id"] == k, ]
+        rt.factor <- factor( c(pair.list.tmp$rt1,pair.list.tmp$rt2) )
+        rt.levels <- levels(rt.factor)
+        main.rt <- rt.levels[ order(table(rt.factor),rev(rt.levels))[length(rt.levels)] ]
+        if ( main.rt == rt ) {
+          n.nonredundant.hit <- n.nonredundant.hit + 1
+          pair.list.tmp[,"hit.id"] <- n.nonredundant.hit
+          pair.list<- rbind( pair.list, pair.list.tmp )
+        }
       }
+      ##pair.list <- rbind( pair.list, pair.list.this.charge )
     }
-    #pair.list <- rbind( pair.list, pair.list.this.charge )
+  }
+  cat( "Finished\n" )
+
+  if( dim(pair.list)[1] == 0 ) {
+    print("no doublet peaks identified")
+    quit()
   }
 }
-cat( "Finished\n" )
-
-if( dim(pair.list)[1] == 0 ) {
-  print("no doublet peaks identified")
-  quit()
-}
-# table with raw pair peak index, charge, rt and hit.id etc
-out.filename0 <- paste(output.path, output.file.base, ".pair_index.txt", sep="")
+## table with raw pair peak index, charge, rt and hit.id etc
 write.table( format(pair.list,digits=10), out.filename0, quote=FALSE, row.names=FALSE)
 
 # filter and output
+cat("group and refine doublet peaks from peak_pair table...\n")
 rt.window.per.scan <- 6.0 # time elapse per ms1 scan
 mass.window <- 2.0  # plot 2.0 m/z unit from center of delected peak
 num.ms2.per.ms1 <- 18
@@ -272,7 +285,7 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   ## num of peaks
   peaks.n <- length( peaks.maxo )
   ## need at least three peak pairs per hit
-  if (peaks.n < 3) next
+  if (peaks.n < 2) next
 
   ## calculate isotope distribution based on averagine assumption
   predicted.mass <- charge*peaks.mz1[1]
@@ -415,7 +428,7 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   ##chromatogram bottom
   raw.ECI.light <- rawEIC(xfile, c(peak.mz1*(1-mz.ppm.cut), peak.mz1*(1+mz.ppm.cut)) )
   raw.ECI.heavy <- rawEIC(xfile, c(peak.mz2*(1-mz.ppm.cut), peak.mz2*(1+mz.ppm.cut)) )
-  xlimit <-c( max(1, best.scan.number-10), min(best.scan.number+10, length(raw.ECI.light[[1]]) ) )
+  xlimit <-c( max(1, best.scan.number-100), min(best.scan.number+100, length(raw.ECI.light[[1]]) ) )
   ylimit <- range(c(raw.ECI.light[[2]][xlimit[1]:xlimit[2]], raw.ECI.heavy[[2]][xlimit[1]:xlimit[2]]))
   plot(raw.ECI.light[[1]], raw.ECI.light[[2]], type="l", col="red",xlab="scan #", ylab="intensity",
        main=paste("Chromatogram of", as.character(format(peak.mz1, digits=7)),
@@ -450,6 +463,7 @@ if (nrow(out.table)==0) {
 out.table <- out.table[ order(out.table$peaks.count, decreasing=TRUE), ]
 
 out.filename <- paste(output.path, output.file.base, ".table.txt", sep="")
+cat("output final doublet pair table...\n")
 write.table( format(out.table,digits=10), out.filename, quote=FALSE, row.names=FALSE)
 
 ## make a pep3d-style xc/ms intensity plot
@@ -493,4 +507,4 @@ for (i in 1:dim(out.table)[1] ) {
   points( xp, xfile@scantime[yp], type="o", col = rainbow(col.max)[countp] )
 }
 dev.off()
-
+cat("Finished...\n")
