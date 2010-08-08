@@ -8,12 +8,17 @@ if ( sum( args == "no_MS2") > 0 ) {
   includeMS2 <- F
 }
 
+noPeaksN <- F
+if ( sum( args == "no_peaks_n" ) > 0 ) {
+  noPeaksN <- T
+}
+
 if ( length(args) < 2 ) {
   cat("no pair delta mass defined. exit...\n")
   quit()
 }
 library(xcms)
-source("~/svnrepos/R/msisotope.R")
+source("/home/chuwang/svnrepos/R/msisotope.R")
 #memory.limit(2560) # 2.5G memory maximum
 
 input.file.suffix <- ".mzXML"
@@ -285,7 +290,11 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   ## num of peaks
   peaks.n <- length( peaks.maxo )
   ## need at least three peak pairs per hit
-  if (peaks.n < 2) next
+  if (noPeaksN) {
+    if (peaks.n <2 ) next
+  } else {
+    if (peaks.n <3 ) next
+  }
 
   ## calculate isotope distribution based on averagine assumption
   predicted.mass <- charge*peaks.mz1[1]
@@ -340,7 +349,11 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   ## label others under the same envelope
   ## most intense peak position in the light envelope
   i <- which.max(peaks.maxo1)
-  rt <- as.numeric( pair.list.this.id[i,"rt1"] )
+  if ( max(peaks.maxo1) > max(peaks.maxo2) ) {
+    rt <- as.numeric( pair.list.this.id[i,"rt1"] )
+  } else {
+    rt <- as.numeric( pair.list.this.id[i,"rt2"] )
+  }
   ##rt <- ( as.numeric(pair.list.this.id[i,"rt1"]) + as.numeric(pair.list.this.id[i,"rt2"]) ) / 2.0
   rt.range <- c( rt-rt.window.per.scan, rt+rt.window.per.scan)
   ## get corresponding scan number
@@ -375,8 +388,8 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   scan.int <- scan.int/max(scan.int.zoom)
   ##least-sqaured fit with single scan ###
   observed.int <- rep(0,upper.bound)
-  for ( i in 1:upper.bound ) {
-    i.mz <- predicted.mz[i]
+  for ( ii in 1:upper.bound ) {
+    i.mz <- predicted.mz[ii]
     matched.index <- which(abs(scan.mz-i.mz)/predicted.mono.mz<2*mz.ppm.cut)
     if (length(matched.index)>1) {
       matched.index <- matched.index[ which.min(abs(scan.mz[matched.index]-i.mz)) ]
@@ -385,7 +398,7 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
     if (length(i.int) == 0) {
       i.int = 0
     }
-    observed.int[i] <- i.int
+    observed.int[ii] <- i.int
   }
   observed.mono.int <- observed.int[1]
   fit <- lsfit(predicted.int,observed.int) #coefficient-slope
