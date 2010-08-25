@@ -87,7 +87,8 @@ env.score.cutoff <- as.numeric(params[["env.score.cutoff"]])
 r2.cutoff <- as.numeric(params[["r2.cutoff"]])
 ### minimum peak width in numbers of time points###
 minimum.peak.points <- as.numeric(params[["minimum.peak.points"]])
-
+### choose peak pairs with MS2 data only ###
+peaks.with.ms2.only <- as.logical(params[["peaks.with.ms2.only"]])
 ## column names for calculated ratios
 integrated.area.ratio <- paste("IR",cross.vec,sep=".")
 linear.regression.ratio <- paste("NP",cross.vec,sep=".")
@@ -265,6 +266,10 @@ for ( i in 1:dim(cross.table)[1] ) {
       for (n in 1:n.peaks) {
         low <- peaks[2*n-1]
         high<- peaks[2*n]
+        ### when requested, choose peaks with ms2 events only ###
+        if (peaks.with.ms2.only) {
+          if (length(k.ms1.rt.v>0) & (sum((k.ms1.rt.v>=low & k.ms1.rt.v<=high))<=0)) next
+        }
         yes <- which( raw.ECI.light.rt>=low & raw.ECI.light.rt<=high )
         light.yes <- raw.ECI.light[[2]][yes]
         heavy.yes <- raw.ECI.heavy[[2]][yes]
