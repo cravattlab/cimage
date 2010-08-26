@@ -226,10 +226,10 @@ for ( i in 1:dim(cross.table)[1] ) {
         k.ms1.rt <- xfile@scantime[k.ms1.scan]/60
         if (all.ms2.HL[k] == "light") {
           points(k.ms1.rt, raw.ECI.light[[2]][k.ms1.scan], type='p',cex=0.5, pch=1)
-          k.ms1.int.light.v <- c(k.ms1.int.light.v, raw.ECI.light[[2]][k.ms1.scan])
+          #k.ms1.int.light.v <- c(k.ms1.int.light.v, raw.ECI.light[[2]][k.ms1.scan])
         } else if (all.ms2.HL[k] == "heavy") {
           points(k.ms1.rt, raw.ECI.heavy[[2]][k.ms1.scan], type='p',cex=0.5, pch=1)
-          k.ms1.int.heavy.v <- c(k.ms1.int.heavy.v, raw.ECI.heavy[[2]][k.ms1.scan])
+          #k.ms1.int.heavy.v <- c(k.ms1.int.heavy.v, raw.ECI.heavy[[2]][k.ms1.scan])
         } else {
           points(k.ms1.rt, max(raw.ECI.light[[2]][k.ms1.scan],raw.ECI.heavy[[2]][k.ms1.scan]),
                  type='p',cex=0.5, pch=1,col="black")
@@ -246,6 +246,9 @@ for ( i in 1:dim(cross.table)[1] ) {
       } else {
         points(tag.rt, max(raw.ECI.light[[2]][tag.ms1.scan.num],raw.ECI.heavy[[2]][tag.ms1.scan.num]), type='p',pch=8)
       }
+      ## record MS1 intensity at which MS2 is triggered
+      k.ms1.int.light.v <- raw.ECI.light[[2]][tag.ms1.scan.num]
+      k.ms1.int.heavy.v <- raw.ECI.heavy[[2]][tag.ms1.scan.num]
       ## guess ratio of integrated peak area
       local.xlimit <- c(max(scan.time.range[1]/60, tag.rt-local.rt.window),
                         min(scan.time.range[2]/60, tag.rt+local.rt.window))
