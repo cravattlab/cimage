@@ -110,6 +110,8 @@ for ($i=1; $i<$nrow; ++$i) {
 	    } else {
 		print OUTFILE "<TD $bgcolormap[$j]> $bold1 $line[$j] $bold2";
 	    }
+	} elsif (/^(\d+\/\d+)/) {
+	    print OUTFILE "<TD $bgcolormap[$j]> $bold1 $1 $bold2";
 	} else {
 	    print OUTFILE "<TD $bgcolormap[$j]> $bold1 $line[$j] $bold2";
 	}

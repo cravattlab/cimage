@@ -152,6 +152,32 @@ findPairChromPeaks <- function(rt, light.int, heavy.int, rt.range, local.rt.rang
   return(pair.range)
 }
 
+findSingleChromPeaks <- function(rt, light.int, rt.range, local.rt.range, sn=5) {
+  rtdiff <- mean( diff(rt) )
+
+  m.light <- cbind(rt,light.int)
+  dimnames(m.light)[[2]] <- c("rt","intensity")
+  m.light.global <- m.light[rt>=rt.range[1]&rt<=rt.range[2],]
+  noise.light.global <- estimateChromPeakNoise(m.light.global[,"intensity"])
+  m.light.local  <- m.light[rt>=local.rt.range[1]&rt<=local.rt.range[2],]
+  noise.light.local <- estimateChromPeakNoise(m.light.local[,"intensity"])
+  noise.light <- min( noise.light.global, noise.light.local )
+  peaks.light <- findChromPeaks(m.light.global, noise.light, sn, rtgap=0.2)
+  n.light <- dim(peaks.light)[[1]]
+
+  pair.range <- c(noise.light)
+  if ( n.light == 0 ) return(pair.range)
+
+  for (i in 1:n.light) {
+    low <- peaks.light[i,"rt.min"]
+    high <- peaks.light[i,"rt.max"]
+    if ( low < high ) {
+      pair.range <- c(pair.range,low,high)
+    }
+  }
+  return(pair.range)
+}
+
 readFileFromMsn <- function( xcms.raw ) {
   filename <- xcms.raw@filepath
   filename.base <- strsplit(filename,".mzXML")[[1]][1]

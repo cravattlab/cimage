@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ $# -lt 1 ]; then
-    echo Usage: $0 cimage.params set_1 set_2 ...
+    echo Usage: $0 cimage.params [no_png] set_1 set_2 ...
     exit -1
 fi
 param=$1
@@ -10,6 +10,10 @@ if [ ! -f "$param" ];
 then
     echo cannot find cimage.param file : $param
     exit -1
+fi
+no_png=$1
+if [ "$no_png" == "no_png" ]; then
+    shift;
 fi
 
 mzxml=$@
@@ -102,9 +106,9 @@ cd output
 for p in $(\ls *.pdf | sed 's/\.pdf//g')
 do
     ##ps2pdf $p.ps
-##    if [ "$no_png" == "no_png" ]; then
-	##echo no png graphic conversion as requested
-##    else
+    if [ "$no_png" == "no_png" ]; then
+	echo no png graphic conversion as requested
+    else
 	##pdftops $p.pdf $p.ps
 	mkdir -p PNG
 	npages=$(cat $p.to_excel.txt | wc -l)
@@ -139,7 +143,7 @@ do
 	    nb=$(($nb+1))
 	done
 	##rm -rf $p.ps
-##    fi
+    fi
     echo done with $p.pdf
 done
 cd ..

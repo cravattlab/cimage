@@ -212,6 +212,7 @@ for ( i in 1:dim(cross.table)[1] ) {
          ylab="intensity", main=tt.main, xlim=xlimit,ylim=ylimit)
     lines(raw.ECI.heavy.rt, raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
     k.ms1.rt.v <- k.ms1.scan.v <- numeric(0)
+    k.ms1.int.light.v <- k.ms1.int.heavy.v <- 0
     if ( !is.na(tag.rt) ) {
       all.ms2.scan <- as.integer( all.scan.table[(key==all.scan.table[,"key"]
                                                   &cross.vec[j]==all.scan.table[,"run"]),"scan"] )
@@ -225,8 +226,10 @@ for ( i in 1:dim(cross.table)[1] ) {
         k.ms1.rt <- xfile@scantime[k.ms1.scan]/60
         if (all.ms2.HL[k] == "light") {
           points(k.ms1.rt, raw.ECI.light[[2]][k.ms1.scan], type='p',cex=0.5, pch=1)
+          k.ms1.int.light.v <- c(k.ms1.int.light.v, raw.ECI.light[[2]][k.ms1.scan])
         } else if (all.ms2.HL[k] == "heavy") {
           points(k.ms1.rt, raw.ECI.heavy[[2]][k.ms1.scan], type='p',cex=0.5, pch=1)
+          k.ms1.int.heavy.v <- c(k.ms1.int.heavy.v, raw.ECI.heavy[[2]][k.ms1.scan])
         } else {
           points(k.ms1.rt, max(raw.ECI.light[[2]][k.ms1.scan],raw.ECI.heavy[[2]][k.ms1.scan]),
                  type='p',cex=0.5, pch=1,col="black")
@@ -261,7 +264,7 @@ for ( i in 1:dim(cross.table)[1] ) {
     best.peak.scan.num <- best.mono.check <- best.r2 <- best.npoints <- best.light.int <- best.ratio <- 0.0
     best.xlm <- best.light.yes <- best.heavy.yes <- best.low <- best.high <- c(0)
     best.fixed <- F
-    n.candidate.peaks <- n.ms2.peaks <- 0
+    n.light.ms2.peak <- n.heavy.ms2.peak <- n.candidate.peaks <- n.ms2.peaks <- 0
     if (n.peaks>0) {
       for (n in 1:n.peaks) {
         low <- peaks[2*n-1]
@@ -425,7 +428,12 @@ for ( i in 1:dim(cross.table)[1] ) {
       plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
       plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
     }
-    l.ratios[j] <- paste(n.ms2.peaks, n.candidate.peaks, sep="/")
+    l.ratios[j] <- paste(n.ms2.peaks, n.candidate.peaks,
+                         format(max(k.ms1.int.light.v), digits=1, scientific=T),
+                         format(noise.light, digits=1, scientific=T),
+                         format(max(k.ms1.int.heavy.v), digits=1, scientific=T),
+                         format(noise.heavy, digits=1, scientific=T),
+                         sep="/")
   } ## each ratio j
   tt <- paste("Entry ", as.character(i), "-  Charge: ", as.character(charge),
               " - M/Z: ", as.character(format(mz.light, digits=7)),
