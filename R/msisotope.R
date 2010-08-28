@@ -86,6 +86,7 @@ findChromPeaks <- function(spec, noise, sn=5, rtgap=0.2 ) {
 
 ##  noise <- estimateChromPeakNoise(spec[,"intensity"] )
 
+  noise <- max(noise, 1e-5)
   spectab <- matrix(nrow = 0, ncol = 4)
   colnames(spectab) <- c("rt", "rt.min", "rt.max", "sn")
 
