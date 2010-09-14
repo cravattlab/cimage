@@ -443,11 +443,11 @@ for ( i in 1:dim(cross.table)[1] ) {
               "and", as.character(format(mz.heavy,digits=7)))
   mtext(tt, line=3.5, outer=T)
   mtext(paste(cross.table[i,"peptide"],"; Mono.mass: ", as.character(mono.mass), "; Mono.mz: ", as.character(round(mono.mz,5)),sep=""),
-        cex=0.8, line=2, out=T)
+        cex=0.8, line=2, outer=T)
   mtext(paste(cross.table[i,"ipi"],description),line=0.8, cex=0.8,out=T)
   ## save data in outdf
   lnk.i <- ceiling(i/500)-1
-  lnk.j <- (i%%500)-1
+  lnk.j <- (i-1)%%500
   lnk.name <- paste('./PNG/', lnk.i, '/', out.filename.base,'.', lnk.i, '-', lnk.j,'.png',sep='')
   this.df <- c(i, ipi, description, symbol, peptide, round(mass,digits=4), charge, segment,
                i.ratios, light.int.v, l.ratios, r2.v, entry.index,
