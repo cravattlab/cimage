@@ -56,10 +56,13 @@ init.aa.mass <- function(atom.mass.vec, chem.table ) {
 
 element.count <- function(sequence.vec, element, chem.table) {
   ## sequence.vec is a vector of sequence character
+  defined.aas <- rownames(chem.table)
   if ( element %in% colnames(chem.table) ) {
     count<- 0
     for ( aa in sequence.vec ) {
-      count<- count + chem.table[aa,element]
+      if ( aa %in% defined.aas ){
+        count<- count + chem.table[aa,element]
+      }
     }
     count <- count+ chem.table["NTERM",element] + chem.table["CTERM",element]
     return(count)
@@ -78,8 +81,11 @@ vectorize.sequence <- function(sequence) {
 calc.peptide.mass <- function(sequence, aa.mass.vec) {
   peptide.vec <- vectorize.sequence(sequence)
   mass <- 0
+  defined.aas <- names(aa.mass.vec)
   for ( aa in peptide.vec ) {
-    mass <- mass + aa.mass.vec[aa]
+    if ( aa %in% defined.aas ) {
+      mass <- mass + aa.mass.vec[aa]
+    }
   }
   mass <- mass + aa.mass.vec["NTERM"] + aa.mass.vec["CTERM"]
   return(mass)
