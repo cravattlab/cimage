@@ -5,8 +5,8 @@
 
 from sys import argv
 
-if len(argv) != 2:
-    print 'Usage: %s <peptide_sequence> <mono|avg>'%argv[0]
+if len(argv) != 3:
+    print 'Usage: %s <peptide_sequence> <diffmod>'%argv[0]
     print 'calculate peptide mass based on SEQUEST'
 
 weightmap = {
@@ -35,6 +35,7 @@ weightmap = {
       'R' : 156.1011106,
       'Y' : 163.0633282,
       'W' : 186.0793126,
+      '*' : float(argv[2]),
       }
 
 dHplus = 1.0072765
@@ -48,7 +49,10 @@ an =[]
 for c in pepseq:
     if c in weightmap:
         mass = mass + weightmap[c]
-        an.append(mass)
+        if c == '*':
+            an[-1] = mass
+        else:
+            an.append(mass)
     else:
         print "unrecognized sequence", c
         assert 0
