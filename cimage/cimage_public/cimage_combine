@@ -1,0 +1,45 @@
+#!/bin/bash
+
+if [ $# -lt 2 ]; then
+    echo Usage: $0 [by_protein] text_file dir1 ...
+    exit -1
+fi
+
+by_protein=""
+if [ $1 == "by_protein" ]; then
+    by_protein=$1
+    shift
+fi
+txt=$1
+shift
+allpt=""
+outname="combined"
+for p in $@
+do
+    outname=$outname\_$p
+    pt=$(find $p -name $txt)
+    allpt="$allpt $pt"
+done
+dirs=$(echo $allpt | sed "s/$txt//g")
+
+nchar=$(echo $outname | wc -c)
+##if [ "$nchar" -gt 20 ]; then
+##    outname="combine_all"
+##fi
+
+if [ "$by_protein" == "by_protein" ]; then
+    R --vanilla --args $txt $dirs < $CIMAGE_PATH/combined_by_protein.R > $outname.by_protein.Rout
+else
+    R --vanilla --args $txt $dirs < $CIMAGE_PATH/combined.R > $outname.Rout
+fi
+
+mv combined.txt $outname.txt
+mv combined.png $outname.png
+if [ -s combined_vennDiagram.png ]; then
+    mv combined_vennDiagram.png $outname.vennDiagram.png
+fi
+
+cwd=$(pwd)
+
+$CIMAGE_PATH/textTableCombinedToHtml.pl $outname $cwd $allpt
+
