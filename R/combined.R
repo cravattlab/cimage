@@ -43,7 +43,7 @@ table <- as.list(dirs)
 r2.cutoff <- 0.8
 
 ## read in the first table and figure out headers
-tmp.table <- read.table(paste(dirs[1],input.file,sep=""),header=T,sep="\t",quote="")
+tmp.table <- read.table(paste(dirs[1],input.file,sep=""),header=T,sep="\t",quote="",comment.char="")
 tmp.names <- names(tmp.table)
 ## to rename columns
 v1 <- which(substr(tmp.names,1,3) == "IR.")
@@ -58,7 +58,7 @@ vn4 <- paste("INT.set_",seq(1,nset),sep="")
 
 all.table <- NULL
 for (i in 1:length(dirs) ) {
-  table[[i]] <- read.table(paste(dirs[i],input.file,sep=""),header=T,sep="\t",quote="")
+  table[[i]] <- read.table(paste(dirs[i],input.file,sep=""),header=T,sep="\t",quote="",comment.char="")
   names(table[[i]])[c(v1,v2,v3,v4)] <- c(vn1,vn2,vn3,vn4)
   table[[i]][,"sequence"] <- as.character( table[[i]][,"sequence"] )
   table[[i]]$run<-i

@@ -11,7 +11,7 @@ table <- as.list(ratio.files)
 all.uniq <- NULL
 sp=" "
 for (i in 1:nset ) {
-  tmp.table <- read.table(ratio.files[i], header=T,sep="\t",quote="",as.is=T)
+  tmp.table <- read.table(ratio.files[i], header=T,sep="\t",quote="",as.is=T,comment.char="")
   for (j in 1:nrow(tmp.table)) {
     if ( ! is.na(tmp.table[j,"index"]) ) {
       tmp.table[j,"ipi"] = tmp.table[j+1,"ipi"]
