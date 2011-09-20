@@ -37,9 +37,11 @@ for line in open(argv[1]):
                 print 'cimageipi-'+ipi
                 # find tag
                 ipi_words = ipi.split()
-                i = ipi_words[0].find("|")
+                tmp_word = ipi_words[0].replace("IPI:", "").replace("sp|","").replace("tr|","")
+                i = tmp_word.find("|")
                 if i>0:
-                    tag = ipi_words[0][0:i]
+                    tmp2 = tmp_word.split("|")
+                    tag = tmp2[0]
                 else:
                     tag = ipi_words[0]
                 # print out tagged lines
