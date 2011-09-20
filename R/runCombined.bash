@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ $# -lt 2 ]; then
-    echo Usage: $0 [by_protein] text_file dir1 ...
+    echo Usage: $0 [by_protein] [exclude_singleton] text_file dir1 ...
     exit -1
 fi
 
@@ -10,6 +10,12 @@ if [ $1 == "by_protein" ]; then
     by_protein=$1
     shift
 fi
+exclude_singleton=""
+if [ $1 == "exclude_singleton" ]; then
+    exclude_singleton=$1
+    shift
+fi
+
 txt=$1
 shift
 allpt=""
@@ -28,9 +34,9 @@ nchar=$(echo $outname | wc -c)
 ##fi
 
 if [ "$by_protein" == "by_protein" ]; then
-    R --vanilla --args $txt $dirs < /home/chuwang/svnrepos/R/combined_by_protein.R > $outname.by_protein.Rout
+    R --vanilla --args $exclude_singleton $txt $dirs < /home/chuwangsvnrepos/R/combined_by_protein.R > $outname.by_protein.Rout
 else
-    R --vanilla --args $txt $dirs < /home/chuwang/svnrepos/R/combined.R > $outname.Rout
+    R --vanilla --args $txt $dirs < /home/chuwangsvnrepos/R/combined.R > $outname.Rout
 fi
 
 mv combined.txt $outname.txt
@@ -41,5 +47,5 @@ fi
 
 cwd=$(pwd)
 
-/home/chuwang/svnrepos/perl/textTableCombinedToHtml.pl $outname $cwd $allpt
+/home/chuwangsvnrepos/perl/textTableCombinedToHtml.pl $outname $cwd $allpt
 

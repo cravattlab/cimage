@@ -36,7 +36,11 @@ uniq.tryptic.sequence <- function( raw.sequence ) {
 
 ## file name from input args
 args <- commandArgs(trailingOnly=T)
-
+exclude.singleton <- F
+if ( args[1] == "exclude_singleton" ) {
+  exclude.singleton <- T
+  args <- args[-1]
+}
 input.file <- args[1]
 dirs <- args[-1]
 table <- as.list(dirs)
@@ -82,8 +86,8 @@ sp=" "
 count <- 0
 link.list <- as.list( levels(as.factor(all.table$uniq) ) )
 nuniq <- length(link.list)
-out.num.matrix <- matrix(0 ,nrow=nuniq,ncol=2*nset)
-colnames(out.num.matrix) <- c( paste("mr.set_",seq(1,nset),sep=""), paste("sd.set_",seq(1,nset),sep=""))
+out.num.matrix <- matrix(0 ,nrow=nuniq,ncol=4*nset)
+colnames(out.num.matrix) <- c( paste("mr.set_",seq(1,nset),sep=""), paste("mean.set_",seq(1,nset),sep=""),paste("sd.set_",seq(1,nset),sep=""), paste("noqp.set_",seq(1,nset),sep=""))
 char.names <- c("index","ipi", "description", "symbol", "sequence", "mass", "run", "charge", "segment", "link")
 out.char.matrix <- matrix(" ",nrow=nuniq,ncol=length(char.names))
 colnames(out.char.matrix) <- char.names
@@ -107,13 +111,37 @@ for (uniq in levels(as.factor(all.table$uniq) ) ) {
   out.char.matrix[count,"ipi"] <- as.character(uniq)
   out.char.matrix[count,"description"] <- sub.table[1,"description"]
   out.char.matrix[count,"symbol"] <- sub.table[1,"symbol"]
-  out.char.matrix[count,"run"] <- paste(levels(as.factor(sub.table[,"run"])),sep="",collapse="")
-  out.char.matrix[count,"charge"] <- paste(levels(as.factor(sub.table[,"charge"])),sep="",collapse="")
-  out.char.matrix[count,"segment"] <- paste(levels(as.factor(sub.table[,"segment"])),sep="",collapse="")
+  if (sum(pass)>=1) {
+    out.char.matrix[count,"run"] <- paste(levels(as.factor(sub.table[pass,"run"])),sep="",collapse="")
+    out.char.matrix[count,"charge"] <- paste(levels(as.factor(sub.table[pass,"charge"])),sep="",collapse="")
+    out.char.matrix[count,"segment"] <- paste(levels(as.factor(sub.table[pass,"segment"])),sep="",collapse="")
+  } else {
+    out.char.matrix[count,"run"] <- paste(levels(as.factor(sub.table[,"run"])),sep="",collapse="")
+    out.char.matrix[count,"charge"] <- paste(levels(as.factor(sub.table[,"charge"])),sep="",collapse="")
+    out.char.matrix[count,"segment"] <- paste(levels(as.factor(sub.table[,"segment"])),sep="",collapse="")
+  }
   for ( k in 1:nset ) {
     kk <- k + nset
-    out.num.matrix[count,k]  <- round(median(sub.table[pass,vn1[k]],na.rm=T),digits=2)
-    out.num.matrix[count,kk] <- round(sd(sub.table[pass,vn1[k]],na.rm=T),digits=2)
+    kkk <- kk + nset
+    kkkk <- kkk + nset
+    ## for bmartin, exclude singleton cases for median and sd calculation, also remove c-terminal peptides without mass shift.
+    pass <- pass & ! ( (sub.table[,vn1[k]] == 1) & (sub.table[,vn3[k]] == 1) )
+    if (exclude.singleton) {
+      pass2 <- pass & (sub.table[,vn1[k]] != 20)
+    } else {
+      pass2 <- pass
+    }
+    if (sum(pass2) >= 1 ) {
+      out.num.matrix[count,k]  <- round(median(sub.table[pass2,vn1[k]],na.rm=T),digits=2)
+      out.num.matrix[count,kk]  <- round(mean(sub.table[pass2,vn1[k]],na.rm=T),digits=2)
+      out.num.matrix[count,kkk] <- round(sd(sub.table[pass2,vn1[k]],na.rm=T),digits=2)
+      out.num.matrix[count,kkkk] <- sum(pass2)
+    } else {
+      out.num.matrix[count,k]  <- round(median(sub.table[pass,vn1[k]],na.rm=T),digits=2)
+      out.num.matrix[count,kk]  <- round(mean(sub.table[pass,vn1[k]],na.rm=T),digits=2)
+      out.num.matrix[count,kkk] <- round(sd(sub.table[pass,vn1[k]],na.rm=T),digits=2)
+      out.num.matrix[count,kkkk] <- sum(pass2)
+    }
   }
 }
 
