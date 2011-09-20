@@ -24,3 +24,5 @@ minimum.peak.points = 3
 peaks.with.ms2.only = FALSE
 !!! output data folder name !!!
 output.path  = output
+!!! singleton ratios !!!
+singleton.ratio = 20.00
