@@ -69,7 +69,7 @@ for (name in mzXML.names) {
   cat(paste(name,"\n",sep=""))
   mzXML.files[[name]] <- xcmsRaw( paste("../",name,sep=""), profstep=0, includeMSn=T)
 }
-
+##}
 ## more parameters from input files
 ## retention time window for alignment across multiple samples
 rt.window <- as.numeric(params[["rt.window"]])
@@ -89,6 +89,8 @@ r2.cutoff <- as.numeric(params[["r2.cutoff"]])
 minimum.peak.points <- as.numeric(params[["minimum.peak.points"]])
 ### choose peak pairs with MS2 data only ###
 peaks.with.ms2.only <- as.logical(params[["peaks.with.ms2.only"]])
+### singleton case ratio ###
+singleton.ratio <- as.numeric(params[["singleton.ratio"]])
 ## column names for calculated ratios
 integrated.area.ratio <- paste("IR",cross.vec,sep=".")
 linear.regression.ratio <- paste("NP",cross.vec,sep=".")
@@ -115,7 +117,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-##for ( i in 1:40) {
+##for ( i in 2748:2748) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -265,6 +267,7 @@ for ( i in 1:dim(cross.table)[1] ) {
     n.peaks <- length(peaks)/2
 
     best.peak.scan.num <- best.mono.check <- best.r2 <- best.npoints <- best.light.int <- best.ratio <- 0.0
+    best.mono.check <- 0.1
     best.xlm <- best.light.yes <- best.heavy.yes <- best.low <- best.high <- c(0)
     best.fixed <- F
     n.light.ms2.peak <- n.heavy.ms2.peak <- n.candidate.peaks <- n.ms2.peaks <- 0
@@ -290,9 +293,14 @@ for ( i in 1:dim(cross.table)[1] ) {
         ## calculate ratio of integrated peak area
         if (HL.ratios[j]) {
           ratio <- round((sum(heavy.yes)/sum(light.yes))*correction.factor,digits=2)
+          peak.scan.num <- raw.ECI.heavy[[1]][yes][which.max(heavy.yes)]
+          peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.mass.heavy-2)/charge, mz.heavy+5) )
+          mono.check.heavy <- checkChargeAndMonoMass( peak.scan, mono.mass.heavy, charge, mz.ppm.cut, predicted.dist.heavy[(mass.shift+1):length(predicted.dist.heavy)])
+          mono.check <- max(mono.check, mono.check.heavy)
         } else {
           ratio <- round((sum(light.yes)/sum(heavy.yes))/correction.factor,digits=2)
         }
+        if( singleton.ratio > 0  & ratio > singleton.ratio ) next
         lines(c(low,low),ylimit/10, col="green")
         lines(c(high,high),ylimit/10, col="green")
         text(mean(c(low,high)),max(light.yes,heavy.yes)*1.2,
@@ -404,10 +412,10 @@ for ( i in 1:dim(cross.table)[1] ) {
       } else {
         scan.int <- scan.int/max(scan.int)
       }
-      ylimit <- c(0,1.1)
-      plot(scan.mz, scan.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit, col="gray")
+      ylimit2 <- c(0,1.1)
+      plot(scan.mz, scan.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit2, col="gray")
       par(new=T)
-      plot(predicted.mz, observed.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit, col="black")
+      plot(predicted.mz, observed.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit2, col="black")
       if ( mass.shift >0 ){
         light.n <- seq(1,length(light.index))##seq(1,(mass.shift))
         heavy.n <- seq(length(light.index)+1, length(predicted.mz))##seq((mass.shift+1),2*mass.shift)
@@ -415,9 +423,9 @@ for ( i in 1:dim(cross.table)[1] ) {
         light.n <- heavy.n <- seq(1,3)
       }
       par(new=T)
-      plot( predicted.mz[light.n], predicted.dist.merge[light.n], type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
+      plot( predicted.mz[light.n], predicted.dist.merge[light.n], type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit2)
       par(new=T)
-      plot( predicted.mz[heavy.n], predicted.dist.merge[heavy.n], type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
+      plot( predicted.mz[heavy.n], predicted.dist.merge[heavy.n], type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit2)
 
       points(predicted.mz[light.n],rep(0,length(light.n)), pch=23,col="red",bg="white")
       points(predicted.mz[heavy.n],rep(0,length(heavy.n)), pch=24,col="blue",bg="white")
@@ -427,9 +435,62 @@ for ( i in 1:dim(cross.table)[1] ) {
                    round(xfile@scantime[best.peak.scan.num]/60,1)," min; NL:",
                    formatC(int.max, digits=2,format="e"), sep = ""))
     } else {
-      ##plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
-      plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
-      plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+      if (peaks.with.ms2.only & (singleton.ratio>0)) {
+        if (HL.ratios[j]) {
+          mono.single <- mono.mass.heavy
+          raw.ECI.rt.single <- raw.ECI.heavy.rt
+          raw.ECI.single <- raw.ECI.heavy
+          k.ms1.int.ratio <- max(k.ms1.int.heavy.v)/max(c(0.01,k.ms1.int.light.v))
+        } else {
+          mono.single <- mono.mass
+          raw.ECI.rt.single <- raw.ECI.light.rt
+          raw.ECI.single <- raw.ECI.light
+          k.ms1.int.ratio <- max(k.ms1.int.light.v)/max(c(0.01,k.ms1.int.heavy.v))
+        }
+        single.peaks <- findSingleChromPeaks(raw.ECI.rt.single, raw.ECI.single[[2]],xlimit, local.xlimit, sn )
+        single.peaks <- single.peaks[-1]
+        n.single.peaks <- length(single.peaks)/2
+        n.singleton.peaks <- numeric(0)
+        if (n.single.peaks>0) {
+          for (ns in 1:n.single.peaks) {
+            low.single <- single.peaks[2*ns-1]
+            high.single <- single.peaks[2*ns]
+            k.ms1.rt.v.tmp <- (k.ms1.rt.v >=low.single & k.ms1.rt.v <= high.single)
+            if (length(k.ms1.rt.v>0) & (sum(k.ms1.rt.v.tmp)<=0)) next
+            if (k.ms1.int.ratio < 3) next
+            yes.single <- which( raw.ECI.rt.single>=low.single & raw.ECI.rt.single<=high.single )
+            int.yes.single <- raw.ECI.single[[2]][yes.single]
+            peak.scan.num <- raw.ECI.single[[1]][yes.single][which.max(int.yes.single)]
+            peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.single-2)/charge,
+                                                         (mono.single+10)/charge) )
+            mono.check.single <- checkChargeAndMonoMass( peak.scan, mono.single, charge, mz.ppm.cut,
+                                                        predicted.dist)
+            ## did not pass env score filter
+            if (mono.check.single < env.score.cutoff) next
+            npoints.single <- length(yes.single)
+            ## peak is too narrow with very few time points
+            if (npoints.single<minimum.peak.points) next
+            ##
+            lines(c(low.single,low.single),ylimit/2,col="green")
+            lines(c(high.single,high.single),ylimit/2,col="green")
+            text(mean(c(low.single,high.single)),max(int.yes.single)*1.2, labels=paste(round(singleton.ratio,2),round(mono.check.single),sep="/"))
+            i.ratios[j] <- singleton.ratio
+            r2.v[j] <- 1.0
+            plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+            plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+            n.singleton.peaks <- c(n.singleton.peaks,ns)
+            break
+          }
+        }
+        if (length(n.singleton.peaks) == 0) {
+          plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+          plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+        }
+      } else {
+        ##plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+        plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+        plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+      }
     }
     l.ratios[j] <- paste(n.ms2.peaks, n.candidate.peaks,
                          format(max(k.ms1.int.light.v), digits=1, scientific=T),
@@ -486,3 +547,4 @@ row.names(all.table.out) <- as.character(seq(1:dim(all.table.out)[1]) )
 all.table.out[,"index"] <- seq(1:dim(all.table.out)[1])
 write.table(all.table.out,file=paste(output.path,"/",out.filename.base,".to_excel.txt",sep=""),
             quote=F, sep="\t", row.names=F,na="0.00")
+
