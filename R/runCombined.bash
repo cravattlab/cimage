@@ -16,8 +16,13 @@ if [ $1 == "exclude_singleton" ]; then
     shift
 fi
 
-txt=$1
-shift
+tmptxt=$(echo $1 | cut -c1-7)
+if [ $tmptxt == "output_rt" ]; then
+    txt=$1
+    shift
+else
+    txt="output_rt_10_sn_2.5.to_excel.txt"
+fi
 allpt=""
 outname="combined"
 for p in $@
@@ -34,9 +39,9 @@ nchar=$(echo $outname | wc -c)
 ##fi
 
 if [ "$by_protein" == "by_protein" ]; then
-    R --vanilla --args $exclude_singleton $txt $dirs < /home/chuwangsvnrepos/R/combined_by_protein.R > $outname.by_protein.Rout
+    R --vanilla --args $exclude_singleton $txt $dirs < /home/chuwang/svnrepos/R/combined_by_protein.R > $outname.by_protein.Rout
 else
-    R --vanilla --args $txt $dirs < /home/chuwangsvnrepos/R/combined.R > $outname.Rout
+    R --vanilla --args $txt $dirs < /home/chuwang/svnrepos/R/combined.R > $outname.Rout
 fi
 
 mv combined.txt $outname.txt
@@ -47,5 +52,9 @@ fi
 
 cwd=$(pwd)
 
-/home/chuwangsvnrepos/perl/textTableCombinedToHtml.pl $outname $cwd $allpt
+if [ "$by_protein" == "by_protein" ]; then
+    /home/chuwang/svnrepos/perl/textTableCombinedToHtml_by_protein.pl $outname $cwd $allpt
+else
+    /home/chuwang/svnrepos/perl/textTableCombinedToHtml.pl $outname $cwd $allpt
+fi
 
