@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ $# -lt 2 ]; then
+if [ $# -lt 1 ]; then
     echo Usage: $0 [by_protein] [exclude_singleton] text_file dir1 ...
     exit -1
 fi
