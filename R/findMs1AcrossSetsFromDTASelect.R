@@ -1,6 +1,7 @@
 library(xcms)
-source("/home/chuwang/svnrepos/R/inputparams.R")
-source("/home/chuwang/svnrepos/R/msisotope.R")
+cimage.path <- Sys.getenv("CIMAGE_PATH")
+source(paste(cimage.path,"/R/inputparams.R",sep=""))
+source(paste(cimage.path,"/R/msisotope.R",sep=""))
 
 ## file name from input args
 args <- commandArgs(trailingOnly=T)

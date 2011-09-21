@@ -12,9 +12,9 @@ if [ $1 == "by_protein" ]; then
 fi
 
 if [ "$by_protein" == "by_protein" ]; then
-    R --vanilla --args $@ < /home/chuwang/svnrepos/R/compare_averged_ratios_by_protein.R > compare_averged_ratios_by_protein.Rout
+    R --vanilla --args $@ < $CIMAGE_PATH/R/compare_averged_ratios_by_protein.R > compare_averged_ratios_by_protein.Rout
 else
-    R --vanilla --args $@ < /home/chuwang/svnrepos/R/compare_averged_ratios.R > compare_averged_ratios.Rout
+    R --vanilla --args $@ < $CIMAGE_PATH/R/compare_averged_ratios.R > compare_averged_ratios.Rout
 fi
 
 

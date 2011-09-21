@@ -39,9 +39,9 @@ nchar=$(echo $outname | wc -c)
 ##fi
 
 if [ "$by_protein" == "by_protein" ]; then
-    R --vanilla --args $exclude_singleton $txt $dirs < /home/chuwang/svnrepos/R/combined_by_protein.R > $outname.by_protein.Rout
+    R --vanilla --args $exclude_singleton $txt $dirs < $CIMAGE_PATH/R/combined_by_protein.R > $outname.by_protein.Rout
 else
-    R --vanilla --args $txt $dirs < /home/chuwang/svnrepos/R/combined.R > $outname.Rout
+    R --vanilla --args $txt $dirs < $CIMAGE_PATH/R/combined.R > $outname.Rout
 fi
 
 mv combined.txt $outname.txt
@@ -53,8 +53,8 @@ fi
 cwd=$(pwd)
 
 if [ "$by_protein" == "by_protein" ]; then
-    /home/chuwang/svnrepos/perl/textTableCombinedToHtml_by_protein.pl $outname $cwd $allpt
+    $CIMAGE_PATH/perl/textTableCombinedToHtml_by_protein.pl $outname $cwd $allpt
 else
-    /home/chuwang/svnrepos/perl/textTableCombinedToHtml.pl $outname $cwd $allpt
+    $CIMAGE_PATH/perl/textTableCombinedToHtml.pl $outname $cwd $allpt
 fi
 
