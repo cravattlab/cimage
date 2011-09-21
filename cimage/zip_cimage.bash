@@ -8,29 +8,36 @@ fi
 
 cd $1
 
+hst=$(hostname)
+
 wd=$(pwd)
 echo current working dir: $wd
 
-nhtml=$(\ls ./combine*.html | wc -l);
-if [ "$nhtml" -eq 0 ]; then
-    echo no combined html results found! Exit...
-    exit -1;
-fi
+#nhtml=$(\ls ./*.html | wc -l);
+#if [ "$nhtml" -eq 0 ]; then
+#    echo no html results found! Exit...
+#    exit -1;
+#fi
 
-rhost="137.131.5.161"
-ruser="samba"
-rdir="/srv/www/htdocs/cimage/tempul/"
+rhost="www.scripps.edu"
+rdir="/web/docs/chemphys/cravatt/cimage/tempul/"
 
 out="temp"
-echo compress txt, html and png files into $out.zip
-find ./ -name "*.txt" -o -name "*.html" -o -name "*.png" | zip $out -@
+#echo compress txt, html and png files into $out.zip
+#find ./ -name "*.txt" -o -name "*.html" -o -name "*.png" | zip $out -@
+echo $hst:$wd > $out.txt
+if ! grep public_html $out.txt; then
+    echo ERROR: Your data is not accessible from public_html folder! Exit ...
+    exit -1
+fi
 
-chmod a+rw $out.zip
+find ./ -name "combine*.html" >> $out.txt
+chmod a+rw $out.txt
 
-echo transfer $out.zip to server \(use password \"cravatt\"\) and this may take some time
-rsync -ar --progress --remove-source-files $out.zip $ruser@$rhost:$rdir
+echo transfer $out.txt to server \(use your TSRI password\)
+rsync -ar $out.txt $rhost:$rdir
 
 echo transfer complete! Add it to CIMAGE database at URL below!
-echo http://bfclabcomp3.scripps.edu/cimage/
+echo http://www.scripps.edu/chemphys/cravatt/cimage/
 
 exit 0
