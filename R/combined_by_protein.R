@@ -87,7 +87,7 @@ count <- 0
 link.list <- as.list( levels(as.factor(all.table$uniq) ) )
 nuniq <- length(link.list)
 out.num.matrix <- matrix(0 ,nrow=nuniq,ncol=4*nset)
-colnames(out.num.matrix) <- c( paste("mr.set_",seq(1,nset),sep=""), paste("mean.set_",seq(1,nset),sep=""),paste("sd.set_",seq(1,nset),sep=""), paste("noqp.set_",seq(1,nset),sep=""))
+colnames(out.num.matrix) <- c( paste("mr.set_",seq(1,nset),sep=""), paste("sd.set_",seq(1,nset),sep=""),paste("mean.set_",seq(1,nset),sep=""), paste("noqp.set_",seq(1,nset),sep=""))
 char.names <- c("index","ipi", "description", "symbol", "sequence", "mass", "run", "charge", "segment", "link")
 out.char.matrix <- matrix(" ",nrow=nuniq,ncol=length(char.names))
 colnames(out.char.matrix) <- char.names
@@ -133,13 +133,13 @@ for (uniq in levels(as.factor(all.table$uniq) ) ) {
     }
     if (sum(pass2) >= 1 ) {
       out.num.matrix[count,k]  <- round(median(sub.table[pass2,vn1[k]],na.rm=T),digits=2)
-      out.num.matrix[count,kk]  <- round(mean(sub.table[pass2,vn1[k]],na.rm=T),digits=2)
-      out.num.matrix[count,kkk] <- round(sd(sub.table[pass2,vn1[k]],na.rm=T),digits=2)
+      out.num.matrix[count,kk] <- round(sd(sub.table[pass2,vn1[k]],na.rm=T),digits=2)
+      out.num.matrix[count,kkk]  <- round(mean(sub.table[pass2,vn1[k]],na.rm=T),digits=2)
       out.num.matrix[count,kkkk] <- sum(pass2)
     } else {
       out.num.matrix[count,k]  <- round(median(sub.table[pass,vn1[k]],na.rm=T),digits=2)
-      out.num.matrix[count,kk]  <- round(mean(sub.table[pass,vn1[k]],na.rm=T),digits=2)
-      out.num.matrix[count,kkk] <- round(sd(sub.table[pass,vn1[k]],na.rm=T),digits=2)
+      out.num.matrix[count,kk] <- round(sd(sub.table[pass,vn1[k]],na.rm=T),digits=2)
+      out.num.matrix[count,kkk]  <- round(mean(sub.table[pass,vn1[k]],na.rm=T),digits=2)
       out.num.matrix[count,kkkk] <- sum(pass2)
     }
   }
