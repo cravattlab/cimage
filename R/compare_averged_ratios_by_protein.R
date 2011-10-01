@@ -28,7 +28,7 @@ count <- 0
 link.list <- as.list( levels(as.factor(all.uniq) ) )
 nuniq <- length(link.list)
 out.num.matrix <- matrix(NA, nrow=nuniq,ncol=4*nset)
-colnames(out.num.matrix) <- c(output.cols,paste(output.cols,"sd",sep="."),paste(output.cols,"mean",sep="."),paste(output.cols,"noqp",sep="."))
+colnames(out.num.matrix) <- c(paste(output.cols,"median",sep=""),paste(output.cols,"mean",sep="."),paste(output.cols,"sd",sep="."),paste(output.cols,"noqp",sep="."))
 char.names <- c("index","ipi", "description", "symbol", "sequence")
 out.char.matrix <- matrix(" ",nrow=nuniq,ncol=length(char.names))
 colnames(out.char.matrix) <- char.names
