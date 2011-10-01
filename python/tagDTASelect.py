@@ -46,7 +46,8 @@ for line in open(argv[1]):
                     tag = ipi_words[0]
                 # print out tagged lines
                 for pep in pep_lines:
-                    print 'cimagepep-'+tag, pep[1:]
+                    firsttab=pep.index("\t")+1;
+                    print 'cimagepep-'+tag, pep[firsttab:]
             # emtpy lists
             ipi_lines = []
             pep_lines = []
