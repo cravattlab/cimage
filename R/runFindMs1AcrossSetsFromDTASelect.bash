@@ -40,7 +40,7 @@ do
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk '{print $2}' > $p2.tmp.FileName
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk -v HL=$HL '{print $3, HL}' > $p2.tmp.xcorr
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk '{print $NF}' > $p2.tmp.peptide
-	cat $p2.tmp.peptide | sed 's/\*//g' | cut -f2 -d \.  > $p2.tmp.sequence
+	cat $p2.tmp.peptide | sed 's/\*//g' | sed 's/\#//g' | sed 's/\@//g' | cut -f2 -d \.  > $p2.tmp.sequence
 	for p3 in $(cat $p2.tmp.sequence | sort | uniq )
 	do
 	    echo -n "$p3 "
