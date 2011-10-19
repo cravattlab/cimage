@@ -27,8 +27,8 @@ for (i in 1:nset ) {
 count <- 0
 link.list <- as.list( levels(as.factor(all.uniq) ) )
 nuniq <- length(link.list)
-out.num.matrix <- matrix(NA, nrow=nuniq,ncol=2*nset)
-colnames(out.num.matrix) <- c(output.cols,paste(output.cols,"sd",sep="."))
+out.num.matrix <- matrix(NA, nrow=nuniq,ncol=4*nset)
+colnames(out.num.matrix) <- c(paste(output.cols,"median",sep=""),paste(output.cols,"mean",sep="."),paste(output.cols,"sd",sep="."),paste(output.cols,"noqp",sep="."))
 char.names <- c("index","ipi", "description", "symbol", "sequence")
 out.char.matrix <- matrix(" ",nrow=nuniq,ncol=length(char.names))
 colnames(out.char.matrix) <- char.names
@@ -44,13 +44,19 @@ for (uniq in levels(as.factor(all.uniq) ) ) {
     match <- table[[i]][,"uniq"] == uniq
     if ( sum(match) == 1 ) {
       ratio <- table[[i]][match,paste("mr",input.cols[i],sep=".")]
+      ratio.mean <- table[[i]][match,paste("mean",input.cols[i],sep=".")]
+      noqp <- table[[i]][match,paste("noqp",input.cols[i],sep=".")]
       sd <- table[[i]][match,paste("sd",input.cols[i],sep=".")]
       if (ratio > 0.0) {
         out.num.matrix[count,i] <- ratio
-        out.num.matrix[count,i+nset] <- sd
+        out.num.matrix[count,i+nset] <- ratio.mean
+        out.num.matrix[count,i+2*nset] <- sd
+        out.num.matrix[count,i+3*nset] <- noqp
       } else {
         out.num.matrix[count,i] <- NA
         out.num.matrix[count,i+nset] <- NA
+        out.num.matrix[count,i+2*nset] <- NA
+        out.num.matrix[count,i+3*nset] <- NA
       }
     }
   }

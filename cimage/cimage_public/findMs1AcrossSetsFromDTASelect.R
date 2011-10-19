@@ -1,486 +1,7 @@
-read.input.params <- function( file.name ) {
-  params <- list()
-  raw.input <- scan(file.name, what=character(), quiet=TRUE, comment.char="!")
-  equal.pos <- which( raw.input == "=" )
-  n.params <- length(equal.pos)
-  ## param 1:(N-1)
-  for ( i in 1:(n.params-1) ) {
-    param.name <- raw.input[equal.pos[i]-1]
-    param.data <- raw.input[(equal.pos[i]+1):(equal.pos[i+1]-2)]
-    params[[param.name]] <- param.data
-  }
-  ## last param
-  param.name <- raw.input[equal.pos[n.params]-1]
-  param.data <- raw.input[(equal.pos[n.params]+1):length(raw.input)]
-  params[[param.name]] <- param.data
-  return(params)
-}
-
-read.chem.table <- function( table.name ) {
-  orig.table <- read.table(table.name, header=T, sep="\t", comment.char="!")
-  named.table <- orig.table[,2:ncol(orig.table)]
-  rownames(named.table) <- orig.table[,1]
-  return(named.table)
-}
-
-init.atom.mass <- function() {
-  atom.mass.vec <- c(12.000000, #C
-                     1.007825,  #H
-                     15.994915, #O
-                     14.003074, #N
-                     31.972072, #S
-                     30.973763, #P
-                     15.000109, #N15
-                     2.014102,  #H2
-                     13.003355, #C13
-                     1.0072765  #Hplus
-                     )
-  names(atom.mass.vec) <- c("C","H","O","N","S","P","N15","H2","C13","Hplus")
-  return(atom.mass.vec)
-}
-
-init.aa.mass <- function(atom.mass.vec, chem.table ) {
-  aa.names <- rownames(chem.table)
-  chem.names <- colnames(chem.table)
-  aa.mass.vec <- rep(0, length(aa.names))
-  names(aa.mass.vec) <- aa.names
-  for (aa in aa.names ) {
-    mass <- 0.0
-    for (chem in chem.names) {
-      mass <- mass + atom.mass.vec[chem]*chem.table[aa,chem]
-    }
-    aa.mass.vec[aa] <- mass
-  }
-  return(aa.mass.vec)
-}
-
-element.count <- function(sequence.vec, element, chem.table) {
-  ## sequence.vec is a vector of sequence character
-  defined.aas <- rownames(chem.table)
-  if ( element %in% colnames(chem.table) ) {
-    count<- 0
-    for ( aa in sequence.vec ) {
-      if ( aa %in% defined.aas ){
-        count<- count + chem.table[aa,element]
-      }
-    }
-    count <- count+ chem.table["NTERM",element] + chem.table["CTERM",element]
-    return(count)
-  } else {
-    return(0)
-  }
-}
-
-vectorize.sequence <- function(sequence) {
-  ## get rid of flanking residues deliminated by "."
-  peptide.vec <- unlist( strsplit(sequence,".",fixed=T) )
-  peptide.vec <- unlist( strsplit(peptide.vec[2],"",fixed=T) )
-  return(peptide.vec)
-}
-
-calc.peptide.mass <- function(sequence, aa.mass.vec) {
-  peptide.vec <- vectorize.sequence(sequence)
-  mass <- 0
-  defined.aas <- names(aa.mass.vec)
-  for ( aa in peptide.vec ) {
-    if ( aa %in% defined.aas ) {
-      mass <- mass + aa.mass.vec[aa]
-    }
-  }
-  mass <- mass + aa.mass.vec["NTERM"] + aa.mass.vec["CTERM"]
-  return(mass)
-}
-
-
-calc.num.elements <- function( sequence, chem.table) {
-  peptide.vec <- vectorize.sequence(sequence)
-  elements <- colnames(chem.table)
-  elements.count <- rep(0, length(elements) )
-  names(elements.count) <- elements
-  for ( e in elements) {
-    elements.count[e] <- element.count(peptide.vec, e, chem.table)
-  }
-  return(elements.count)
-}
-
-calc.num.N15 <- function(sequence, chem.table) {
-  peptide.vec <- vectorize.sequence(sequence)
-  num.N15 <- element.count(peptide.vec, "N15", chem.table)
-  return(num.N15)
-}
-
-
-isotope.dist <- function(elements.count, N15.enrichment=1.0) {
-  elements <- c( "C", "H", "O", "N", "S", "P", "N15", "H2", "C13")
-  if ( length(elements.count) < length(elements) ) {
-    elements.count <- c( elements.count, rep(0, length(elements)-length(elements.count)))
-  }
-  heavy <- c(1.10, 0.015, 0.20, 0.37, 4.21, 0, 100, 100, 100)/100
-  names(heavy) <- elements
-  heavy["N15"] <- N15.enrichment
-
-  light <- 1.00 - heavy
-  names(elements.count) <- elements
-  single.prob <- as.list( elements )
-  names(single.prob) <- elements
-  all.prob <- numeric(0)
-  for ( e in elements ) {
-    count <- elements.count[e]
-    if (count == 0) next
-    v <- seq(0,count)
-    l <- light[e]
-    h <- heavy[e]
-    new.prob <- single.prob[[e]] <- round(choose(count,v)*(l^(count-v))*(h^v),4)
-    if (e =="O" | e =="S") { # O and S isotopes are 2 Da more
-      new.prob <- rep(0,2*count+1)
-      for( i in 1:(count+1)) {
-        new.prob[(i-1)*2+1] <- single.prob[[e]][i]
-      }
-      single.prob[[e]] <- new.prob
-    }
-    #print(single.prob[[e]])
-    if ( length(all.prob) > 0 ) {
-      d <- length(all.prob)-length(new.prob)
-      if ( d > 0) {
-        new.prob <- c(new.prob,rep(0,d))
-      } else if ( d< 0 ) {
-        all.prob <- c( all.prob,rep(0,-d) )
-      }
-      all.prob <- round(convolve(all.prob, rev(new.prob),type="o"),4)
-    } else {
-      all.prob <- single.prob[[e]]
-    }
-  }
-  return(all.prob)
-##  return(single.prob)
-}
-
-## isotope.dist(c(60,13,13,86,2))
-averagine.count <- function(input.mass) {
-  averagine.mass <- 111.1254
-  elements <- c( "C", "H", "O", "N", "S" )
-  averagine.comp <- c( 4.9348, 7.7583, 1.4773, 1.3577,0.0417 )
-  names(averagine.comp) <- elements
-  return( round(averagine.comp*(input.mass/averagine.mass)) )
-}
-
-## ms2 triggered?
-find.ms2.triggered <- function(xfile, yfile, predicted.mz, rt.range) {
-  ms1.scanNums <- which( xfile@scantime>=rt.range[1]&xfile@scantime<=rt.range[2] )
-  ms2.matrix <- matrix(0, nrow=length(ms1.scanNums), ncol=length(predicted.mz) )
-  dimnames(ms2.matrix)[[1]] <- as.character(ms1.scanNums)
-  dimnames(ms2.matrix)[[2]] <- as.character(predicted.mz)
-  if (is.null(yfile)) {
-    return(ms2.matrix)
-  }
-  ms2.acq.num.max <- max(xfile@msnAcquisitionNum)
-  for (i in 1:dim(ms2.matrix)[1]) {
-    ms1.scanNum <- ms1.scanNums[i]
-    ms2.acq.num.begin <- xfile@acquisitionNum[ms1.scanNum]+1
-    if ( ms1.scanNum < length(xfile@scantime) ) {
-      ms2.acq.num.end <- xfile@acquisitionNum[ms1.scanNum+1]-1
-    } else {
-      ms2.acq.num.end <- ms2.acq.num.max
-    }
-    ms2.mz <- yfile[yfile[,"num"]>=ms2.acq.num.begin&yfile[,"num"]<=ms2.acq.num.end, "pmz"]
-    for (j in 1:dim(ms2.matrix)[2]) {
-      ms2.matrix[i,j] <- sum( abs( ms2.mz-predicted.mz[j] )<0.1)
-    }
-  }
-  return(ms2.matrix)
-}
-##
-estimateChromPeakNoise <- function(intensity) {
-  mean(intensity)
-}
-
-findChromPeaks <- function(spec, noise, sn=5, rtgap=0.2 ) {
-
-##  noise <- estimateChromPeakNoise(spec[,"intensity"] )
-
-  noise <- max(noise, 1e-5)
-  spectab <- matrix(nrow = 0, ncol = 4)
-  colnames(spectab) <- c("rt", "rt.min", "rt.max", "sn")
-
-  while (spec[i <- which.max(spec[,"intensity"]), "intensity"] > noise*sn) {
-
-    rt <- spec[i,"rt"]
-    intensity <- spec[i,"intensity"]
-    rt.range <- xcms:::descendValue(spec[,"intensity"], noise, i)
-    rt.range <- c(max(1,rt.range[1]-1), min(nrow(spec),rt.range[2]+1) )
-
-    if (rt.range[1] >= 1 && rt.range[2] <= nrow(spec)) {
-      rt.min <- spec[rt.range[1],"rt"]
-      rt.max <- spec[rt.range[2],"rt"]
-      if (!any(abs(spectab[,"rt"] - rt) <= rtgap))
-        spectab <- rbind(spectab, c(rt, rt.min, rt.max, spec[i,"intensity"]/noise))
-    }
-    spec[seq(rt.range[1], rt.range[2]),"intensity"] <- 0
-    }
-
-    spectab
-}
-
-findPairChromPeaks <- function(rt, light.int, heavy.int, rt.range, local.rt.range, sn=5) {
-  rtdiff <- mean( diff(rt) )
-
-  m.light <- cbind(rt,light.int)
-  dimnames(m.light)[[2]] <- c("rt","intensity")
-  m.light.global <- m.light[rt>=rt.range[1]&rt<=rt.range[2],]
-  noise.light.global <- estimateChromPeakNoise(m.light.global[,"intensity"])
-  m.light.local  <- m.light[rt>=local.rt.range[1]&rt<=local.rt.range[2],]
-  noise.light.local <- estimateChromPeakNoise(m.light.local[,"intensity"])
-  noise.light <- min( noise.light.global, noise.light.local )
-  peaks.light <- findChromPeaks(m.light.global, noise.light, sn, rtgap=0.2)
-  n.light <- dim(peaks.light)[[1]]
-
-  m.heavy <- cbind(rt,heavy.int)
-  dimnames(m.heavy)[[2]] <- c("rt","intensity")
-  m.heavy.global <- m.heavy[rt>=rt.range[1]&rt<=rt.range[2],]
-  noise.heavy.global <- estimateChromPeakNoise(m.heavy.global[,"intensity"])
-  m.heavy.local <- m.heavy[rt>=local.rt.range[1]&rt<=local.rt.range[2],]
-  noise.heavy.local <- estimateChromPeakNoise(m.heavy.local[,"intensity"])
-  noise.heavy <- min( noise.heavy.global, noise.heavy.local )
-  peaks.heavy <- findChromPeaks(m.heavy.global,noise.heavy,sn,rtgap=0.2)
-  n.heavy <- dim(peaks.heavy)[[1]]
-
-  pair.range <- c(noise.light, noise.heavy)
-  if ( n.heavy == 0 | n.light == 0 ) return(pair.range)
-
-  for (i in 1:n.light) {
-    rt.i <- peaks.light[i,"rt"]
-    d.rt <- abs(rt.i-peaks.heavy[,"rt"])
-    j <- which.min(d.rt)
-   # if (d.rt[j]>5*rtdiff) next
-    rt.j <- peaks.heavy[j,"rt"]
-    if ( rt.j >=peaks.light[i,"rt.min"] & rt.j <= peaks.light[i,"rt.max"]
-        &  rt.i >=peaks.heavy[j,"rt.min"] & rt.i <= peaks.heavy[j,"rt.max"] ) {
-      low <- min(peaks.light[i,"rt.min"],peaks.heavy[j,"rt.min"])
-      high <- max(peaks.light[i,"rt.max"],peaks.heavy[j,"rt.max"])
-      if ( low < high ) {
-        pair.range <- c(pair.range,low,high)
-      }
-    }
-  }
-  return(pair.range)
-}
-
-findSingleChromPeaks <- function(rt, light.int, rt.range, local.rt.range, sn=5) {
-  rtdiff <- mean( diff(rt) )
-
-  m.light <- cbind(rt,light.int)
-  dimnames(m.light)[[2]] <- c("rt","intensity")
-  m.light.global <- m.light[rt>=rt.range[1]&rt<=rt.range[2],]
-  noise.light.global <- estimateChromPeakNoise(m.light.global[,"intensity"])
-  m.light.local  <- m.light[rt>=local.rt.range[1]&rt<=local.rt.range[2],]
-  noise.light.local <- estimateChromPeakNoise(m.light.local[,"intensity"])
-  noise.light <- min( noise.light.global, noise.light.local )
-  peaks.light <- findChromPeaks(m.light.global, noise.light, sn, rtgap=0.2)
-  n.light <- dim(peaks.light)[[1]]
-
-  pair.range <- c(noise.light)
-  if ( n.light == 0 ) return(pair.range)
-
-  for (i in 1:n.light) {
-    low <- peaks.light[i,"rt.min"]
-    high <- peaks.light[i,"rt.max"]
-    if ( low < high ) {
-      pair.range <- c(pair.range,low,high)
-    }
-  }
-  return(pair.range)
-}
-
-readFileFromMsn <- function( xcms.raw ) {
-  filename <- xcms.raw@filepath
-  filename.base <- strsplit(filename,".mzXML")[[1]][1]
-  dtable <- read.table(paste(filename.base,".ms1.mz_int",sep=""), header=T)
-  xcms.raw@env$mz <- dtable[,"mz"]
-  xcms.raw@env$intensity <- dtable[,"int"]
-  dtable <- read.table(paste(filename.base,".ms1.index_table",sep=""), header=T)
-  xcms.raw@scanindex <- dtable[,"scanindex"]
-  xcms.raw@scantime  <- dtable[,"scantime"]
-  xcms.raw@acquisitionNum <- dtable[,"acquisitionNum"]
-  if ( length(xcms.raw@msnScanindex) > 0 ) {
-    dtable <- read.table(paste(filename.base,".ms2.mz_int",sep=""), header=T)
-    xcms.raw@env$msnMz <- dtable[,"mz"]
-    xcms.raw@env$msnIntensity <- dtable[,"int"]
-    dtable <- read.table(paste(filename.base,".ms2.index_table",sep=""), header=T)
-    xcms.raw@msnScanindex <- dtable[, "msnScanindex"]
-    xcms.raw@msnAcquisitionNum <- dtable[, "msnAcquisitionNum"]
-    xcms.raw@msnPrecursorScan <- dtable[, "msnPrecursorScan"]
-    xcms.raw@msnLevel <- dtable[, "msnLevel"]
-    xcms.raw@msnRt <- dtable[, "msnRt"]
-    xcms.raw@msnPrecursorMz <- dtable[, "msnPrecursorMz"]
-    xcms.raw@msnPrecursorIntensity <- dtable[, "msnPrecursorIntensity"]
-    xcms.raw@msnPrecursorCharge <- rep(1, length(xcms.raw@msnPrecursorIntensity))
-    xcms.raw@msnCollisionEnergy <- rep(xcms.raw@msnCollisionEnergy[1], length(xcms.raw@msnPrecursorIntensity))
-  }
-  return( xcms.raw )
-}
-
-checkChargeAndMonoMass <- function(peak.scan, mono.mass, charge, mz.ppm.cut, predicted.dist) {
-  cc <- 0.0
-  isotope.mass.unit <- 1.0033548
-  Hplus.mass <- 1.0072765
-  isomer.max <- which.max(predicted.dist)
-  isomer.v <- seq(1, (isomer.max+2) )
-  isomer.fit <- predicted.dist[ isomer.v ] / predicted.dist[isomer.max]
-  isomer.v <- c(0, isomer.v)
-  isomer.fit <- c(0, isomer.fit)
-  isomer.mz <- (mono.mass + (isomer.v-1)*isotope.mass.unit)/charge+Hplus.mass
-  raw.dist <- isomer.fit
-  for ( i in 1:length(raw.dist) ) {
-    this.mz <- isomer.mz[i]
-    mz.diff <- abs(peak.scan[,1]-this.mz)/this.mz
-    if (min(mz.diff) <= mz.ppm.cut ) {
-      raw.dist[i] <- peak.scan[which.min(mz.diff),2]
-    } else {
-      raw.dist[i] <- cc
-    }
-  }
-  max.raw.dist <- max(raw.dist)
-  if ( max.raw.dist > 0.0 ) {
-    raw.dist <- raw.dist / max.raw.dist
-  } else {
-    ## no signal found at all
-    return(cc)
-  }
-  ## a strong peak left to the monoisotopic peak
-  if (raw.dist[1] > 0.5) return(cc)
-  ## only one point for correlation analysis
-  npts.expect <- sum(isomer.fit > 0.10)
-  if (sum(raw.dist>0) < npts.expect ) return(cc)
-  ## quick check on charge states -- take spectrum above 10% intensity cutoff and measure peak gap
-  ## not sufficient for overlapping peaks
-  i.mz <- which.max(raw.dist)
-  if (i.mz == length(raw.dist) ) return(cc)
-  mz.range <- c(isomer.mz[i.mz]*(1-mz.ppm.cut), isomer.mz[i.mz+1]*(1+mz.ppm.cut))
-  int.range <- max.raw.dist*c(raw.dist[i.mz+1], raw.dist[i.mz])
-  tmp1 <- peak.scan[,"intensity"]>=int.range[1] & peak.scan[,"mz"] >= mz.range[1] & peak.scan[,"mz"] <= mz.range[2]
-  peak.mz <- peak.scan[tmp1,"mz"]
-  n.extra.peak <- length(peak.mz)-2
-  wrong.charge <- FALSE
-  if (n.extra.peak > 0) {
-    for ( j in 1:n.extra.peak ) {
-      new.mz <- seq(mz.range[1],mz.range[2],length=j+2)
-      wrong.charge <- TRUE
-      for ( k in 1:length(new.mz) ) {
-        this.mz <- new.mz[k]
-        mz.diff <- abs(peak.mz-this.mz)/this.mz
-        if (sum(mz.diff<mz.ppm.cut) == 0) {
-          wrong.charge <- FALSE
-          break
-        }
-      }
-      if (wrong.charge) return(cc)
-    }
-  }
-  cc <- cor(isomer.fit,raw.dist)
-  return(cc)
-}
-
-multiTitle <- function(...){
-###
-### multi-coloured title
-###
-### examples:
-###  multiTitle(color="red","Traffic",
-###             color="orange"," light ",
-###             color="green","signal")
-###
-### - note triple backslashes needed for embedding quotes:
-###
-###  multiTitle(color="orange","Hello ",
-###             color="red"," \\\"world\\\"!")
-###
-### Barry Rowlingson <b.rowlingson@lancaster.ac.uk>
-###
-  l = list(...)
-  ic = names(l)=='color'
-  colors = unique(unlist(l[ic]))
-
-  for(i in colors){
-    color=par()$col.main
-    strings=c()
-    for(il in 1:length(l)){
-      p = l[[il]]
-      if(ic[il]){ # if this is a color:
-        if(p==i){  # if it's the current color
-          current=TRUE
-        }else{
-          current=FALSE
-        }
-      }else{ # it's some text
-        if(current){
-          # set as text
-          strings = c(strings,paste('"',p,'"',sep=""))
-        }else{
-          # set as phantom
-          strings = c(strings,paste("phantom(\"",p,"\")",sep=""))
-        }
-      }
-    } # next item
-    ## now plot this color
-    prod=paste(strings,collapse="*")
-    express = paste("expression(",prod,")",sep="")
-    e=eval(parse(text=express))
-    title(e,col.main=i)
-  } # next color
-  return()
-}
-
-multiMtext <- function(...){
-###
-### multi-coloured mtext
-###
-### examples:
-###  multiMtext(color="red","Traffic",
-###             color="orange"," light ",
-###             color="green","signal")
-###
-### - note triple backslashes needed for embedding quotes:
-###
-###  multiTitle(color="orange","Hello ",
-###             color="red"," \\\"world\\\"!")
-###
-### Barry Rowlingson <b.rowlingson@lancaster.ac.uk>
-###
-  l = list(...)
-  ic = names(l)=='color'
-  colors = unique(unlist(l[ic]))
-
-  for(i in colors){
-    color=par()$col.main
-    strings=c()
-    for(il in 1:length(l)){
-      p = l[[il]]
-      if(ic[il]){ # if this is a color:
-        if(p==i){  # if it's the current color
-          current=TRUE
-        }else{
-          current=FALSE
-        }
-      }else{ # it's some text
-        if(current){
-          # set as text
-          strings = c(strings,paste('"',p,'"',sep=""))
-        }else{
-          # set as phantom
-          strings = c(strings,paste("phantom(\"",p,"\")",sep=""))
-        }
-      }
-    } # next item
-    ## now plot this color
-    prod=paste(strings,collapse="*")
-    express = paste("expression(",prod,")",sep="")
-    e=eval(parse(text=express))
-    mtext(e,col=i,line=0.5,outer=T)
-  } # next color
-  return()
-}
-
 library(xcms)
+cimage.path <- Sys.getenv("CIMAGE_PATH")
+source(paste(cimage.path,"/R/inputparams.R",sep=""))
+source(paste(cimage.path,"/R/msisotope.R",sep=""))
 
 ## file name from input args
 args <- commandArgs(trailingOnly=T)
@@ -549,7 +70,7 @@ for (name in mzXML.names) {
   cat(paste(name,"\n",sep=""))
   mzXML.files[[name]] <- xcmsRaw( paste("../",name,sep=""), profstep=0, includeMSn=T)
 }
-
+##}
 ## more parameters from input files
 ## retention time window for alignment across multiple samples
 rt.window <- as.numeric(params[["rt.window"]])
@@ -569,6 +90,8 @@ r2.cutoff <- as.numeric(params[["r2.cutoff"]])
 minimum.peak.points <- as.numeric(params[["minimum.peak.points"]])
 ### choose peak pairs with MS2 data only ###
 peaks.with.ms2.only <- as.logical(params[["peaks.with.ms2.only"]])
+### singleton case ratio ###
+singleton.ratio <- as.numeric(params[["singleton.ratio"]])
 ## column names for calculated ratios
 integrated.area.ratio <- paste("IR",cross.vec,sep=".")
 linear.regression.ratio <- paste("NP",cross.vec,sep=".")
@@ -595,7 +118,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-##for ( i in 1:40) {
+##for ( i in 2748:2748) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -745,6 +268,7 @@ for ( i in 1:dim(cross.table)[1] ) {
     n.peaks <- length(peaks)/2
 
     best.peak.scan.num <- best.mono.check <- best.r2 <- best.npoints <- best.light.int <- best.ratio <- 0.0
+    best.mono.check <- 0.1
     best.xlm <- best.light.yes <- best.heavy.yes <- best.low <- best.high <- c(0)
     best.fixed <- F
     n.light.ms2.peak <- n.heavy.ms2.peak <- n.candidate.peaks <- n.ms2.peaks <- 0
@@ -770,9 +294,14 @@ for ( i in 1:dim(cross.table)[1] ) {
         ## calculate ratio of integrated peak area
         if (HL.ratios[j]) {
           ratio <- round((sum(heavy.yes)/sum(light.yes))*correction.factor,digits=2)
+          peak.scan.num <- raw.ECI.heavy[[1]][yes][which.max(heavy.yes)]
+          peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.mass.heavy-2)/charge, mz.heavy+5) )
+          mono.check.heavy <- checkChargeAndMonoMass( peak.scan, mono.mass.heavy, charge, mz.ppm.cut, predicted.dist.heavy[(mass.shift+1):length(predicted.dist.heavy)])
+          mono.check <- max(mono.check, mono.check.heavy)
         } else {
           ratio <- round((sum(light.yes)/sum(heavy.yes))/correction.factor,digits=2)
         }
+        if( singleton.ratio > 0  & ratio > singleton.ratio ) next
         lines(c(low,low),ylimit/10, col="green")
         lines(c(high,high),ylimit/10, col="green")
         text(mean(c(low,high)),max(light.yes,heavy.yes)*1.2,
@@ -884,10 +413,10 @@ for ( i in 1:dim(cross.table)[1] ) {
       } else {
         scan.int <- scan.int/max(scan.int)
       }
-      ylimit <- c(0,1.1)
-      plot(scan.mz, scan.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit, col="gray")
+      ylimit2 <- c(0,1.1)
+      plot(scan.mz, scan.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit2, col="gray")
       par(new=T)
-      plot(predicted.mz, observed.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit, col="black")
+      plot(predicted.mz, observed.int, type='h', xlab="m/z", ylab="intensity", xlim=mass.range, ylim=ylimit2, col="black")
       if ( mass.shift >0 ){
         light.n <- seq(1,length(light.index))##seq(1,(mass.shift))
         heavy.n <- seq(length(light.index)+1, length(predicted.mz))##seq((mass.shift+1),2*mass.shift)
@@ -895,9 +424,9 @@ for ( i in 1:dim(cross.table)[1] ) {
         light.n <- heavy.n <- seq(1,3)
       }
       par(new=T)
-      plot( predicted.mz[light.n], predicted.dist.merge[light.n], type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
+      plot( predicted.mz[light.n], predicted.dist.merge[light.n], type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit2)
       par(new=T)
-      plot( predicted.mz[heavy.n], predicted.dist.merge[heavy.n], type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit)
+      plot( predicted.mz[heavy.n], predicted.dist.merge[heavy.n], type='b',xlab="",ylab="",col="green",axes=F,xlim=mass.range,ylim=ylimit2)
 
       points(predicted.mz[light.n],rep(0,length(light.n)), pch=23,col="red",bg="white")
       points(predicted.mz[heavy.n],rep(0,length(heavy.n)), pch=24,col="blue",bg="white")
@@ -907,9 +436,62 @@ for ( i in 1:dim(cross.table)[1] ) {
                    round(xfile@scantime[best.peak.scan.num]/60,1)," min; NL:",
                    formatC(int.max, digits=2,format="e"), sep = ""))
     } else {
-      ##plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
-      plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
-      plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+      if (peaks.with.ms2.only & (singleton.ratio>0)) {
+        if (HL.ratios[j]) {
+          mono.single <- mono.mass.heavy
+          raw.ECI.rt.single <- raw.ECI.heavy.rt
+          raw.ECI.single <- raw.ECI.heavy
+          k.ms1.int.ratio <- max(k.ms1.int.heavy.v)/max(c(0.01,k.ms1.int.light.v))
+        } else {
+          mono.single <- mono.mass
+          raw.ECI.rt.single <- raw.ECI.light.rt
+          raw.ECI.single <- raw.ECI.light
+          k.ms1.int.ratio <- max(k.ms1.int.light.v)/max(c(0.01,k.ms1.int.heavy.v))
+        }
+        single.peaks <- findSingleChromPeaks(raw.ECI.rt.single, raw.ECI.single[[2]],xlimit, local.xlimit, sn )
+        single.peaks <- single.peaks[-1]
+        n.single.peaks <- length(single.peaks)/2
+        n.singleton.peaks <- numeric(0)
+        if (n.single.peaks>0) {
+          for (ns in 1:n.single.peaks) {
+            low.single <- single.peaks[2*ns-1]
+            high.single <- single.peaks[2*ns]
+            k.ms1.rt.v.tmp <- (k.ms1.rt.v >=low.single & k.ms1.rt.v <= high.single)
+            if (length(k.ms1.rt.v>0) & (sum(k.ms1.rt.v.tmp)<=0)) next
+            if (k.ms1.int.ratio < 3) next
+            yes.single <- which( raw.ECI.rt.single>=low.single & raw.ECI.rt.single<=high.single )
+            int.yes.single <- raw.ECI.single[[2]][yes.single]
+            peak.scan.num <- raw.ECI.single[[1]][yes.single][which.max(int.yes.single)]
+            peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.single-2)/charge,
+                                                         (mono.single+10)/charge) )
+            mono.check.single <- checkChargeAndMonoMass( peak.scan, mono.single, charge, mz.ppm.cut,
+                                                        predicted.dist)
+            ## did not pass env score filter
+            if (mono.check.single < env.score.cutoff) next
+            npoints.single <- length(yes.single)
+            ## peak is too narrow with very few time points
+            if (npoints.single<minimum.peak.points) next
+            ##
+            lines(c(low.single,low.single),ylimit/2,col="green")
+            lines(c(high.single,high.single),ylimit/2,col="green")
+            text(mean(c(low.single,high.single)),max(int.yes.single)*1.2, labels=paste(round(singleton.ratio,2),round(mono.check.single),sep="/"))
+            i.ratios[j] <- singleton.ratio
+            r2.v[j] <- 1.0
+            plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+            plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+            n.singleton.peaks <- c(n.singleton.peaks,ns)
+            break
+          }
+        }
+        if (length(n.singleton.peaks) == 0) {
+          plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+          plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+        }
+      } else {
+        ##plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+        plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+        plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+      }
     }
     l.ratios[j] <- paste(n.ms2.peaks, n.candidate.peaks,
                          format(max(k.ms1.int.light.v), digits=1, scientific=T),
@@ -966,3 +548,4 @@ row.names(all.table.out) <- as.character(seq(1:dim(all.table.out)[1]) )
 all.table.out[,"index"] <- seq(1:dim(all.table.out)[1])
 write.table(all.table.out,file=paste(output.path,"/",out.filename.base,".to_excel.txt",sep=""),
             quote=F, sep="\t", row.names=F,na="0.00")
+

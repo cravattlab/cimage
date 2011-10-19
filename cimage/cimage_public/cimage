@@ -35,16 +35,16 @@ do
 	    IPIDB="0"
 	fi
 	HL=$(echo $p2 | sed 's/\.txt$//g' | awk -F "_" '{print $NF}')
-	$CIMAGE_PATH/tagDTASelect.py $p2 > $p2.tagged;
+	$CIMAGE_PATH/python/tagDTASelect.py $p2 > $p2.tagged;
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | sed 's/^cimagepep\-//g' | sed 's/IPI://g' | sed 's/'sp\|'//g' | sed 's/'tr\|'//g' | awk '{print $1}' > $p2.tmp.ipi
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk '{print $2}' > $p2.tmp.FileName
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk -v HL=$HL '{print $3, HL}' > $p2.tmp.xcorr
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk '{print $NF}' > $p2.tmp.peptide
-	cat $p2.tmp.peptide | sed 's/\*//g' | cut -f2 -d \.  > $p2.tmp.sequence
+	cat $p2.tmp.peptide | sed 's/\*//g' | sed 's/\#//g' | sed 's/\@//g' | cut -f2 -d \.  > $p2.tmp.sequence
 	for p3 in $(cat $p2.tmp.sequence | sort | uniq )
 	do
 	    echo -n "$p3 "
-	    $CIMAGE_PATH/peptideCalcMass.py $p3 mono;
+	    $CIMAGE_PATH/python/peptideCalcMass.py $p3 mono;
 	done > $p2.tmp.uniq.mass
 	for p3 in $(cat $p2.tmp.sequence)
 	do
@@ -111,7 +111,7 @@ cat tmp.key_scan | awk '{print $NF, $1, $2, $(NF-1)}' >> all_scan.table
 rm -rf tmp.ipi tmp.name* tmp.ipi_name tmp.key_scan tmp.seq_mass  *.tmp.scan
 
 echo Running xcms to extract chromatographic peaks
-R --vanilla --args $param $mzxml < $CIMAGE_PATH/findMs1AcrossSetsFromDTASelect.R > findMs1AcrossSetsFromDTASelect.Rout
+R --vanilla --args $param $mzxml < $CIMAGE_PATH/R/findMs1AcrossSetsFromDTASelect.R > findMs1AcrossSetsFromDTASelect.Rout
 
 echo Generating graphs
 cd output
