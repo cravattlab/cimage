@@ -31,7 +31,7 @@ if ! grep public_html $out.txt; then
     exit -1
 fi
 
-find ./ -name "combine*.html" >> $out.txt
+find -L ./ -name "combine*.html" >> $out.txt
 chmod a+rw $out.txt
 
 echo transfer $out.txt to server \(use your TSRI password\)
