@@ -63,8 +63,10 @@ do
 	then
 	    cat $p2.tagged | grep ^cimageipi | awk -F "\t" '{print $NF}' | awk -F"l=" '{print $NF}'| cut -c1-50 | sed -e s/^\-/_/g > tmp.name
 	else
-	    cat $p2.tagged | grep ^cimageipi | awk -F "\t" '{print $NF}' | awk -F"GN=" '{print $NF}'| awk '{print $1}' > tmp.name_gene
-	    cat $p2.tagged | grep ^cimageipi | awk -F "\t" '{print $NF}' | awk -F"OS=" '{print $1}'| cut -c1-50 | sed -e s/^\-/_/g > tmp.name_desc
+##	    cat $p2.tagged | grep ^cimageipi | awk -F "\t" '{print $NF}' | awk -F"GN=" '{print $NF}'| awk '{print $1}' > tmp.name_gene
+	    cat $p2.tagged | grep ^cimageipi | awk -F"GN=" '{print $NF}'| awk '{print $1}' > tmp.name_gene
+##	    cat $p2.tagged | grep ^cimageipi | awk -F "\t" '{print $NF}' | awk -F"OS=" '{print $1}'| cut -c1-50 | sed -e s/^\-/_/g > tmp.name_desc
+	    cat $p2.tagged | grep ^cimageipi | awk -F"OS=" '{print $1}'| awk -F"\t" '{print $NF}' | cut -c1-50 | sed -e s/^\-/_/g > tmp.name_desc
 	    paste -d " " tmp.name_gene tmp.name_desc > tmp.name
 	fi
 	paste tmp.ipi tmp.name >> tmp.ipi_name
