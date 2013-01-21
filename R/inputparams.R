@@ -33,9 +33,11 @@ init.atom.mass <- function() {
                      15.000109, #N15
                      2.014102,  #H2
                      13.003355, #C13
-                     1.0072765  #Hplus
+                     1.0072765,  #Hplus
+                     34.96885, #Chlorine
+                     78.91833 #Bromine
                      )
-  names(atom.mass.vec) <- c("C","H","O","N","S","P","N15","H2","C13","Hplus")
+  names(atom.mass.vec) <- c("C","H","O","N","S","P","N15","H2","C13","Hplus","Cl","Br")
   return(atom.mass.vec)
 }
 
