@@ -118,7 +118,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-##for ( i in 2748:2748) {
+#for ( i in 445:445) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -466,15 +466,15 @@ for ( i in 1:dim(cross.table)[1] ) {
                                                          (mono.single+10)/charge) )
             mono.check.single <- checkChargeAndMonoMass( peak.scan, mono.single, charge, mz.ppm.cut,
                                                         predicted.dist)
+            lines(c(low.single,low.single),ylimit/2,col="green")
+            lines(c(high.single,high.single),ylimit/2,col="green")
+            text(mean(c(low.single,high.single)),max(int.yes.single)*1.2, labels=paste(round(singleton.ratio,2),round(mono.check.single,2),sep="/"))
             ## did not pass env score filter
             if (mono.check.single < env.score.cutoff) next
             npoints.single <- length(yes.single)
             ## peak is too narrow with very few time points
             if (npoints.single<minimum.peak.points) next
             ##
-            lines(c(low.single,low.single),ylimit/2,col="green")
-            lines(c(high.single,high.single),ylimit/2,col="green")
-            text(mean(c(low.single,high.single)),max(int.yes.single)*1.2, labels=paste(round(singleton.ratio,2),round(mono.check.single),sep="/"))
             i.ratios[j] <- singleton.ratio
             r2.v[j] <- 1.0
             plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
