@@ -1,9 +1,9 @@
 isotope.dist <- function(elements.count, N15.enrichment=1.0) {
-  elements <- c( "C", "H", "O", "N", "S", "P", "N15", "H2", "C13")
+  elements <- c( "C", "H", "O", "N", "S", "P", "N15", "H2", "C13","Cl", "Br")
   if ( length(elements.count) < length(elements) ) {
     elements.count <- c( elements.count, rep(0, length(elements)-length(elements.count)))
   }
-  heavy <- c(1.10, 0.015, 0.20, 0.37, 4.21, 0, 100, 100, 100)/100
+  heavy <- c(1.10, 0.015, 0.20, 0.37, 4.21, 0, 100, 100, 100, 24.24, 49.31)/100
   names(heavy) <- elements
   heavy["N15"] <- N15.enrichment
 
@@ -19,7 +19,7 @@ isotope.dist <- function(elements.count, N15.enrichment=1.0) {
     l <- light[e]
     h <- heavy[e]
     new.prob <- single.prob[[e]] <- round(choose(count,v)*(l^(count-v))*(h^v),4)
-    if (e =="O" | e =="S") { # O and S isotopes are 2 Da more
+    if (e =="O" | e =="S" | e=="Cl" | e=="Br") { # O, S, Cl and Br isotopes are 2 Da more
       new.prob <- rep(0,2*count+1)
       for( i in 1:(count+1)) {
         new.prob[(i-1)*2+1] <- single.prob[[e]][i]
