@@ -4,7 +4,7 @@ die "Usage: $0 text_table [ratio.png] [run_dirs] \n" if (@ARGV <1 );
 
 $intable="$ARGV[0].txt";
 $cwd=$ARGV[1];
-
+$dset="$cwd/$intable";
 open(INFILE,$intable) || die "cannot open $intable: $!\n";
 @txt = <INFILE>;
 close(INFILE);
@@ -82,6 +82,15 @@ for ($i=0; $i<$ncol; ++$i) {
     #print OUTFILE "<TH align=\"center\" bgcolor=\"HoneyDew\">$header[$i]\n";
     print OUTFILE "<TH bgcolor=\"HoneyDew\">$header[$i]\n";
 }
+print OUTFILE "<TR>\n";
+@line1 = split('\t', $txt[1]);
+for ($i=0; $i<$ncol; ++$i) {
+    if ( $line1[$i] eq ' ' ) {
+	print OUTFILE "<TH bgcolor=\"HoneyDew\"> \n";
+} else {
+    print OUTFILE "<TH bgcolor=\"HoneyDew\"><A HREF=\"http://137.131.5.161/cgi-bin/chuquest/cimage_sort_table.pl?dset=$dset&colname=$header[$i]&ascending=True\" style=\"text-decoration:none\">^</A> <A HREF=\"http://137.131.5.161/cgi-bin/chuquest/cimage_sort_table.pl?dset=$dset&colname=$header[$i]&ascending=False\" style=\"text-decoration:none\">v</A>\n";
+}
+}
 print OUTFILE "<TBODY>\n";
 for ($i=1; $i<$nrow; ++$i) {
     print OUTFILE "<TR>";
@@ -103,7 +112,7 @@ for ($i=1; $i<$nrow; ++$i) {
 	} elsif ( /^([a-zA-Z]+)$/ && $anchor1 ) {
 	    print OUTFILE "<TD $bgcolormap[$j]> <A NAME=\"$1\"></A> $bold1 $1 $bold2";
 	} elsif ( /(\w+)$/ && $j==1 ) {
-	    if (/(IPI\w+)/) {
+	    if (/^(IPI\w+)/) {
 		print OUTFILE "<TD $bgcolormap[$j]><A HREF=\"http://www.ebi.ac.uk/cgi-bin/dbfetch?db=IPI&id=$1&format=default\">$1</A>";
 	    } elsif (/^(\w{6})$/) {
 		print OUTFILE "<TD $bgcolormap[$j]><A HREF=\"http://www.uniprot.org/uniprot/$1\">$1</A>";
