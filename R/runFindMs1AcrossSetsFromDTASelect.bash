@@ -29,6 +29,7 @@ echo -n > tmp.ipi_name
 echo -n > tmp.key_scan
 echo -n > tmp.seq_mass
 # tagged and fwd
+date
 echo Parsing DTASelect files
 for p11 in $(echo $mzxml)
 do
