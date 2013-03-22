@@ -18,6 +18,13 @@ fi
 
 mzxml=$@
 
+ndta=$(\ls DTASelect-filter_*.txt | wc -l)
+if [ "$ndta" -eq 0 ];
+then
+    echo No DTASelect-fitler files found and please double check your working path. Exiting ...
+    exit -1
+fi
+
 echo -n > tmp.ipi_name
 echo -n > tmp.key_scan
 echo -n > tmp.seq_mass
@@ -32,7 +39,11 @@ do
 	if grep -q "IPI:IPI" $p2; then
 	    IPIDB="1"
 	else
-	    IPIDB="0"
+	    if grep -q " GN=" $p2; then
+		IPIDB="2";
+	    else
+		IPIDB="0"
+	    fi
 	fi
 	HL=$(echo $p2 | sed 's/\.txt$//g' | awk -F "_" '{print $NF}')
 	$CIMAGE_PATH/python/tagDTASelect.py $p2 > $p2.tagged;
@@ -59,15 +70,21 @@ do
 	rm -rf $p2.tmp.*
 	cat $p2.tagged | grep ^cimageipi | sed 's/^cimageipi\-//g' | sed 's/IPI://g' | sed 's/'sp\|'//g' | sed 's/'tr\|'//g' | awk '{print $1} '| awk -F"|" '{print $1}'> tmp.ipi
 	## name deliminator "Gene_Symbol=" or "Full="
-	if [ $IPIDB == "1" ];
+	if [ $IPIDB == "1" ]; ## ipi database
 	then
 	    cat $p2.tagged | grep ^cimageipi | awk -F "\t" '{print $NF}' | awk -F"l=" '{print $NF}'| cut -c1-50 | sed -e s/^\-/_/g > tmp.name
 	else
+	    if [ $IPIDB == "2" ]; then # standard uniprot database
 ##	    cat $p2.tagged | grep ^cimageipi | awk -F "\t" '{print $NF}' | awk -F"GN=" '{print $NF}'| awk '{print $1}' > tmp.name_gene
-	    cat $p2.tagged | grep ^cimageipi | awk -F"GN=" '{print $NF}'| awk '{print $1}' > tmp.name_gene
+		cat $p2.tagged | grep ^cimageipi | awk -F"GN=" '{print $NF}'| awk '{print $1}' > tmp.name_gene
 ##	    cat $p2.tagged | grep ^cimageipi | awk -F "\t" '{print $NF}' | awk -F"OS=" '{print $1}'| cut -c1-50 | sed -e s/^\-/_/g > tmp.name_desc
-	    cat $p2.tagged | grep ^cimageipi | awk -F"OS=" '{print $1}'| awk -F"\t" '{print $NF}' | cut -c1-50 | sed -e s/^\-/_/g > tmp.name_desc
-	    paste -d " " tmp.name_gene tmp.name_desc > tmp.name
+		cat $p2.tagged | grep ^cimageipi | awk -F"OS=" '{print $1}'| awk -F"\t" '{print $NF}' | cut -c1-50 | sed -e s/^\-/_/g > tmp.name_desc
+		paste -d " " tmp.name_gene tmp.name_desc > tmp.name
+	    else
+		cat $p2.tagged | grep ^cimageipi | awk -F"[" '{print $1}'| awk -F"\t" '{print $NF}' | awk '{print $1}' > tmp.name_gene
+		cat $p2.tagged | grep ^cimageipi | awk -F"[" '{print $1}'| awk -F"\t" '{print $NF}' | cut -d" " -f2- | cut -c1-50 | sed -e s/^\-/_/g > tmp.name_desc
+		paste -d " " tmp.name_gene tmp.name_desc > tmp.name
+	    fi
 	fi
 	paste tmp.ipi tmp.name >> tmp.ipi_name
     done
@@ -111,6 +128,23 @@ echo "key run scan HL" > all_scan.table
 cat tmp.key_scan | awk '{print $NF, $1, $2, $(NF-1)}' >> all_scan.table
 
 rm -rf tmp.ipi tmp.name* tmp.ipi_name tmp.key_scan tmp.seq_mass  *.tmp.scan
+
+# filter by my_list.txt
+mylist=$(\ls my_list.txt 2> /dev/null | wc -l)
+
+if [ "$mylist" -eq 1 ];
+then
+    echo User provides a customized list in my_list.txt -- filtering...
+    mv my_list.txt my_list.txt.original
+    tr '\r' '\n' < my_list.txt.original > my_list.txt
+    head -1 cross_scan.table > cross_scan.table.tmp
+    for ml in $(cat my_list.txt);
+    do
+	cat cross_scan.table | grep ^$ml >> cross_scan.table.tmp
+    done
+    mv cross_scan.table cross_scan.table.all
+    mv cross_scan.table.tmp cross_scan.table
+fi
 
 echo Running xcms to extract chromatographic peaks
 R --vanilla --args $param $mzxml < $CIMAGE_PATH/R/findMs1AcrossSetsFromDTASelect.R > findMs1AcrossSetsFromDTASelect.Rout
