@@ -34,13 +34,14 @@ done
 dirs=$(echo $allpt | sed "s/$txt//g")
 
 nchar=$(echo $outname | wc -c)
-##if [ "$nchar" -gt 20 ]; then
-##    outname="combine_all"
-##fi
+if [ "$nchar" -gt 20 ]; then
+    outname="combine_all"
+fi
 
 if [ "$by_protein" == "by_protein" ]; then
     R --vanilla --args $exclude_singleton $txt $dirs < $CIMAGE_PATH/R/combined_by_protein.R > $outname.by_protein.Rout
 else
+#    echo  R --vanilla --args $txt $dirs
     R --vanilla --args $txt $dirs < $CIMAGE_PATH/R/combined.R > $outname.Rout
 fi
 
