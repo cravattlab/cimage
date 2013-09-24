@@ -26,6 +26,10 @@ for ($i=0; $i<$ncol; ++$i) {
 $outhtml="$ARGV[0].html";
 ##$outhtml =~ s/\.txt$/\.html/g;
 
+@cwdstr = split("\/",$cwd);
+$str1 = pop(@cwdstr);
+$str2 = pop(@cwdstr);
+$htmltitle = join(":",$str2, $str1);
 open(OUTFILE, ">$outhtml") || die "cannot write to $outhtml: $!\n";
 ##print OUTFILE "Content-type: text/html\n\n";
 print OUTFILE <<ENDOFHEADER;
@@ -39,6 +43,9 @@ table#sample TD {
     text-align: center;
 }
 </STYLE>
+<TITLE>
+$htmltitle
+</TITLE>
 </HEAD>
 <BODY>
 ENDOFHEADER
