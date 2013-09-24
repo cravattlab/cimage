@@ -45,7 +45,7 @@ cross.table <- cbind(cross.table, split.table)
 uniq.ipi.peptides <- as.factor(paste(cross.table[,"ipi"], cross.table[,"peptide"],sep=":"))
 entry.levels <- levels( uniq.ipi.peptides )
 ## all_scan.table
-all.scan.table <- read.table("all_scan.table", header=T, as.is=T,comment.char="")
+all.scan.table <- read.table("all_scan.table", header=T, as.is=T,comment.char="",colClasses=c("character","character","numeric","character"))
 ## file name tags
 cross.vec <- as.character(args)
 ncross <- length(cross.vec)
@@ -440,7 +440,7 @@ for ( i in 1:dim(cross.table)[1] ) {
         lines(c(best.high,best.high),ylimit, col="green")
       }
       if (best.xlm == 0) {
-        plot(0,0,xlab="",ylab="",main=paste("Singleton Peak Found !!!"),col.main="red" )
+        plot(0,0,xlab="",ylab="",main=paste("Singleton Peak Found ! Np = ",npoints.single,sep=""),col.main="red" )
       } else {
         plot(best.heavy.yes,best.light.yes,
              xlab="intensity.heavy", ylab="intensity.light",
@@ -580,7 +580,7 @@ for ( i in 1:dim(cross.table)[1] ) {
       #   }
       #} else {
         ##plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
-      plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+      plot(0,0,xlab="",ylab="",main=paste("No quantified peak(s)") )
       plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
       #}
     }
@@ -639,4 +639,3 @@ row.names(all.table.out) <- as.character(seq(1:dim(all.table.out)[1]) )
 all.table.out[,"index"] <- seq(1:dim(all.table.out)[1])
 write.table(all.table.out,file=paste(output.path,"/",out.filename.base,".to_excel.txt",sep=""),
             quote=F, sep="\t", row.names=F,na="0.00")
-
