@@ -13,7 +13,7 @@ sp=" "
 for (i in 1:nset ) {
   tmp.table <- read.table(ratio.files[i], header=T,sep="\t",quote="",as.is=T,comment.char="")
   for (j in 1:nrow(tmp.table)) {
-    if ( ! is.na(tmp.table[j,"index"]) ) {
+    if ( (! is.na(tmp.table[j,"index"])) & (tmp.table[j,"ipi"]==" ") ) {
       tmp.table[j,"ipi"] = tmp.table[j+1,"ipi"]
       tmp.table[j,"description"] = tmp.table[j+1,"description"]
       tmp.table[j,"symbol"] = tmp.table[j+1,"symbol"]
@@ -55,7 +55,7 @@ for (uniq in levels(as.factor(all.uniq) ) ) {
     if ( sum(match) == 1 ) {
       ratio <- table[[i]][match,paste("mr",input.cols[i],sep=".")]
       sd <- table[[i]][match,paste("sd",input.cols[i],sep=".")]
-      if (ratio > 0.0) {
+      if (!is.na(ratio) & ratio > 0.0) {
         out.num.matrix[count,i] <- ratio
         out.num.matrix[count,i+nset] <- sd
       } else {
