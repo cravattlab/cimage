@@ -34,8 +34,8 @@ fi
 find -L ./ -name "combine*.html" |sort >> $out.txt
 chmod a+rw $out.txt
 
-echo transfer $out.txt to server \(use your TSRI password\)
-rsync -ar $out.txt $rhost:$rdir
+echo transfer $out.txt to server $rhost:$rdir\(use your TSRI password\)
+rsync -avzr $out.txt $rhost:$rdir
 
 echo transfer complete! Add it to CIMAGE database at URL below!
 echo http://www.scripps.edu/cravatt/cimage/
