@@ -11,7 +11,6 @@ args <- args[-1]
 ## read parameters from a file
 params <- read.input.params(param.file)
 
-
 ## initialize atom mass table
 atom.mass.vec <- init.atom.mass()
 ## initialize chemical composition table
@@ -118,7 +117,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-#for ( i in 445:445) {
+#for ( i in 619:619) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -268,7 +267,7 @@ for ( i in 1:dim(cross.table)[1] ) {
     n.peaks <- length(peaks)/2
 
     best.peak.scan.num <- best.mono.check <- best.r2 <- best.npoints <- best.light.int <- best.ratio <- 0.0
-    best.mono.check <- 0.1
+    best.mono.check <- -0.1
     best.xlm <- best.light.yes <- best.heavy.yes <- best.low <- best.high <- c(0)
     best.fixed <- F
     n.light.ms2.peak <- n.heavy.ms2.peak <- n.candidate.peaks <- n.ms2.peaks <- 0
@@ -277,7 +276,7 @@ for ( i in 1:dim(cross.table)[1] ) {
         low <- peaks[2*n-1]
         high<- peaks[2*n]
         ### when requested, choose peaks with ms2 events only ###
-        if (peaks.with.ms2.only) {
+        if (peaks.with.ms2.only | !is.na(tag.rt)) {
           if (length(k.ms1.rt.v>0) & (sum((k.ms1.rt.v>=low & k.ms1.rt.v<=high))<=0)) next
         }
         yes <- which( raw.ECI.light.rt>=low & raw.ECI.light.rt<=high )
@@ -301,7 +300,7 @@ for ( i in 1:dim(cross.table)[1] ) {
         } else {
           ratio <- round((sum(light.yes)/sum(heavy.yes))/correction.factor,digits=2)
         }
-        if( singleton.ratio > 0  & ratio > singleton.ratio ) next
+        if( singleton.ratio > 0  & ratio > singleton.ratio ) next ## let singleton checker handle this case
         lines(c(low,low),ylimit/10, col="green")
         lines(c(high,high),ylimit/10, col="green")
         text(mean(c(low,high)),max(light.yes,heavy.yes)*1.2,
@@ -311,7 +310,10 @@ for ( i in 1:dim(cross.table)[1] ) {
         ##light.yes <- light.yes[yes2]
         ##heavy.yes <- heavy.yes[yes2]
         if (ratio > ratio.range[2] | ratio < ratio.range[1]) next
-        if (mono.check < env.score.cutoff) next
+        ## peaks not passing envelope score filter
+        ##if (mono.check < env.score.cutoff) next ## disable env.score.cutoff check here as it will be handled by cimage_combine exlusively.
+
+        ## peaks are too narrow
         npoints <- length(light.yes)
         if (npoints<minimum.peak.points) {
           next
@@ -327,9 +329,13 @@ for ( i in 1:dim(cross.table)[1] ) {
         }
         if ( !is.na(tag.rt) & tag.rt>=low & tag.rt<=high) {
           best.fixed <- T
+        } else {
+          best.fixed <- F
         }
-        if ( best.fixed | (best.mono.check < 0.95 & mono.check >= best.mono.check) |
-            ( best.mono.check >=0.95 & mono.check >=0.95 & max(light.yes)>max(best.light.yes) ) ) {
+        if ( best.fixed | (best.mono.check < 0.95 & mono.check >= best.mono.check) | ## better envelope score
+            ( best.mono.check >=0.95 & mono.check >=0.95 & max(light.yes,heavy.yes)>max(best.light.yes) ) | ## envelope score equally better, choose a higher peak
+            ( mono.check < env.score.cutoff & mono.check == best.mono.check & max(light.yes,heavy.yes) > max(best.light.yes) ) ## envelope score equally worse, choose a higher peak
+            ) {
           best.mono.check <- mono.check
           best.npoints <- npoints
           best.r2 <- r2
@@ -345,21 +351,106 @@ for ( i in 1:dim(cross.table)[1] ) {
         if (best.fixed) break
       }
     }
+
+
+    if (!best.fixed & !is.na(tag.rt) & (singleton.ratio>0) ) { # if no MS2 within a peak pair, try to identify a singleton peak with MS2
+      singleton.ms2.match <- T # whether a singleton peak has a matching MS2, e.g., light for light or heavy for heavy
+      if (HL.ratios[j]) {
+        if (HL == "light") { singleton.ms2.match <- F } # for singleton heavy, if ms2 is from light, skip
+        mono.single <- mono.mass.heavy
+        raw.ECI.rt.single <- raw.ECI.heavy.rt
+        raw.ECI.single <- raw.ECI.heavy
+        raw.ECI.single.other <- raw.ECI.light
+        k.ms1.int.ratio <- max(k.ms1.int.heavy.v)/max(c(0.01,k.ms1.int.light.v))
+      } else {
+        if (HL == "heavy") { singleton.ms2.match <- F }
+        mono.single <- mono.mass
+        raw.ECI.rt.single <- raw.ECI.light.rt
+        raw.ECI.single <- raw.ECI.light
+        raw.ECI.single.other <- raw.ECI.heavy
+        k.ms1.int.ratio <- max(k.ms1.int.light.v)/max(c(0.01,k.ms1.int.heavy.v))
+      }
+      n.single.peaks <- 0
+      if (singleton.ms2.match) { # find singleton peaks only when a matching MS2 exists
+        single.peaks <- findSingleChromPeaks(raw.ECI.rt.single, raw.ECI.single[[2]],xlimit, local.xlimit, sn )
+        single.peaks <- single.peaks[-1]
+        n.single.peaks <- length(single.peaks)/2
+      }
+      n.singleton.peaks <- numeric(0)
+      if (n.single.peaks>0) {
+        for (ns in 1:n.single.peaks) {
+          low.single <- single.peaks[2*ns-1]
+          high.single <- single.peaks[2*ns]
+          k.ms1.rt.v.tmp <- (k.ms1.rt.v >=low.single & k.ms1.rt.v <= high.single)
+          if (length(k.ms1.rt.v>0) & (sum(k.ms1.rt.v.tmp)<=0)) next ## skip a singleton peak without MS2
+          if (k.ms1.int.ratio < 3) next ## ratio is too small
+          yes.single <- which( raw.ECI.rt.single>=low.single & raw.ECI.rt.single<=high.single )
+          int.yes.single <- raw.ECI.single[[2]][yes.single]
+          int.yes.single.other <- raw.ECI.single.other[[2]][yes.single]
+          peak.scan.num <- raw.ECI.single[[1]][yes.single][which.max(int.yes.single)]
+          peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.single-2)/charge,
+                                                       (mono.single+10)/charge) )
+          mono.check.single <- checkChargeAndMonoMass( peak.scan, mono.single, charge, mz.ppm.cut,
+                                                      predicted.dist)
+          lines(c(low.single,low.single),ylimit/2,col="green")
+          lines(c(high.single,high.single),ylimit/2,col="green")
+          real.singleton.ratio <- round(min(singleton.ratio, sum(int.yes.single)/max(1,sum(int.yes.single.other))), 2)
+          text(mean(c(low.single,high.single)),max(int.yes.single)*1.2, labels=paste(round(real.singleton.ratio,2),round(mono.check.single,2),sep="/"))
+      #       ## did not pass env score filter
+          #if (mono.check.single < env.score.cutoff) next
+          npoints.single <- length(yes.single)
+                                        #       ## peak is too narrow with very few time points
+          if (npoints.single<minimum.peak.points) next
+      #       ##
+          #i.ratios[j] <- singleton.ratio
+          #r2.v[j] <- 1.0
+          best.mono.check <- mono.check.single
+          best.npoints <- npoints.single
+          best.r2 <- 1.0
+          best.ratio <- real.singleton.ratio ##min(singleton.ratio, sum(int.yes.single)/max(1,sum(int.yes.single.other)))
+          best.light.int <- sum(int.yes.single)
+          best.xlm <- 0
+          best.low <- low.single
+          best.high <- high.single
+          best.light.yes <- 0
+          best.heavy.yes <- 0
+          best.peak.scan.num <- peak.scan.num
+
+
+       #      plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+          n.singleton.peaks <- c(n.singleton.peaks,ns)
+          n.ms2.peaks <- n.ms2.peaks + 1
+          n.candidate.peaks <- n.candidate.peaks + 1
+          break
+        }
+      }
+      #   if (length(n.singleton.peaks) == 0) {
+      #     plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+      #     plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+      #   }
+    }
+
     if ( best.r2 != 0 ) {
-      lines(c(best.low,best.low),ylimit, col="green")
-      lines(c(best.high,best.high),ylimit, col="green")
-      plot(best.heavy.yes,best.light.yes,
-           xlab="intensity.heavy", ylab="intensity.light",
-           main=paste("X=",format(best.xlm,digits=4),"; R2=",format(best.r2,digits=3),
-             "; Np=", best.npoints, sep=""),
-           xlim=c(0, max(best.light.yes,best.heavy.yes)),
-           ylim=c(0, max(best.light.yes,best.heavy.yes)))
+      if (best.mono.check >= env.score.cutoff) {
+        i.ratios[j] <- best.ratio
+        light.int.v[j] <- best.light.int
+        ##l.ratios[j] <- best.xlm
+        r2.v[j] <- best.r2
+        lines(c(best.low,best.low),ylimit, col="green")
+        lines(c(best.high,best.high),ylimit, col="green")
+      }
+      if (best.xlm == 0) {
+        plot(0,0,xlab="",ylab="",main=paste("Singleton Peak Found !!!"),col.main="red" )
+      } else {
+        plot(best.heavy.yes,best.light.yes,
+             xlab="intensity.heavy", ylab="intensity.light",
+             main=paste("X=",format(best.xlm,digits=4),"; R2=",format(best.r2,digits=3),
+               "; Np=", best.npoints, sep=""),
+             xlim=c(0, max(best.light.yes,best.heavy.yes)),
+             ylim=c(0, max(best.light.yes,best.heavy.yes)))
+      }
       abline(0,best.xlm)
       abline(0,1,col="grey")
-      i.ratios[j] <- best.ratio
-      light.int.v[j] <- best.light.int
-      ##l.ratios[j] <- best.xlm
-      r2.v[j] <- best.r2
       ## plot raw spectrum
       ##predicted.dist <- predicted.dist[1:20]
       ## upper limit: heavy + 20units ##
@@ -436,62 +527,62 @@ for ( i in 1:dim(cross.table)[1] ) {
                    round(xfile@scantime[best.peak.scan.num]/60,1)," min; NL:",
                    formatC(int.max, digits=2,format="e"), sep = ""))
     } else {
-      if (peaks.with.ms2.only & (singleton.ratio>0)) {
-        if (HL.ratios[j]) {
-          mono.single <- mono.mass.heavy
-          raw.ECI.rt.single <- raw.ECI.heavy.rt
-          raw.ECI.single <- raw.ECI.heavy
-          k.ms1.int.ratio <- max(k.ms1.int.heavy.v)/max(c(0.01,k.ms1.int.light.v))
-        } else {
-          mono.single <- mono.mass
-          raw.ECI.rt.single <- raw.ECI.light.rt
-          raw.ECI.single <- raw.ECI.light
-          k.ms1.int.ratio <- max(k.ms1.int.light.v)/max(c(0.01,k.ms1.int.heavy.v))
-        }
-        single.peaks <- findSingleChromPeaks(raw.ECI.rt.single, raw.ECI.single[[2]],xlimit, local.xlimit, sn )
-        single.peaks <- single.peaks[-1]
-        n.single.peaks <- length(single.peaks)/2
-        n.singleton.peaks <- numeric(0)
-        if (n.single.peaks>0) {
-          for (ns in 1:n.single.peaks) {
-            low.single <- single.peaks[2*ns-1]
-            high.single <- single.peaks[2*ns]
-            k.ms1.rt.v.tmp <- (k.ms1.rt.v >=low.single & k.ms1.rt.v <= high.single)
-            if (length(k.ms1.rt.v>0) & (sum(k.ms1.rt.v.tmp)<=0)) next
-            if (k.ms1.int.ratio < 3) next
-            yes.single <- which( raw.ECI.rt.single>=low.single & raw.ECI.rt.single<=high.single )
-            int.yes.single <- raw.ECI.single[[2]][yes.single]
-            peak.scan.num <- raw.ECI.single[[1]][yes.single][which.max(int.yes.single)]
-            peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.single-2)/charge,
-                                                         (mono.single+10)/charge) )
-            mono.check.single <- checkChargeAndMonoMass( peak.scan, mono.single, charge, mz.ppm.cut,
-                                                        predicted.dist)
-            lines(c(low.single,low.single),ylimit/2,col="green")
-            lines(c(high.single,high.single),ylimit/2,col="green")
-            text(mean(c(low.single,high.single)),max(int.yes.single)*1.2, labels=paste(round(singleton.ratio,2),round(mono.check.single,2),sep="/"))
-            ## did not pass env score filter
-            if (mono.check.single < env.score.cutoff) next
-            npoints.single <- length(yes.single)
-            ## peak is too narrow with very few time points
-            if (npoints.single<minimum.peak.points) next
-            ##
-            i.ratios[j] <- singleton.ratio
-            r2.v[j] <- 1.0
-            plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
-            plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
-            n.singleton.peaks <- c(n.singleton.peaks,ns)
-            break
-          }
-        }
-        if (length(n.singleton.peaks) == 0) {
-          plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
-          plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
-        }
-      } else {
+      # if ( (!is.na(tag.rt)) & (singleton.ratio>0) ) { # singleton peak identification requires a matching MS2 event
+      #   if (HL.ratios[j]) {
+      #     mono.single <- mono.mass.heavy
+      #     raw.ECI.rt.single <- raw.ECI.heavy.rt
+      #     raw.ECI.single <- raw.ECI.heavy
+      #     k.ms1.int.ratio <- max(k.ms1.int.heavy.v)/max(c(0.01,k.ms1.int.light.v))
+      #   } else {
+      #     mono.single <- mono.mass
+      #     raw.ECI.rt.single <- raw.ECI.light.rt
+      #     raw.ECI.single <- raw.ECI.light
+      #     k.ms1.int.ratio <- max(k.ms1.int.light.v)/max(c(0.01,k.ms1.int.heavy.v))
+      #   }
+      #   single.peaks <- findSingleChromPeaks(raw.ECI.rt.single, raw.ECI.single[[2]],xlimit, local.xlimit, sn )
+      #   single.peaks <- single.peaks[-1]
+      #   n.single.peaks <- length(single.peaks)/2
+      #   n.singleton.peaks <- numeric(0)
+      #   if (n.single.peaks>0) {
+      #     for (ns in 1:n.single.peaks) {
+      #       low.single <- single.peaks[2*ns-1]
+      #       high.single <- single.peaks[2*ns]
+      #       k.ms1.rt.v.tmp <- (k.ms1.rt.v >=low.single & k.ms1.rt.v <= high.single)
+      #       if (length(k.ms1.rt.v>0) & (sum(k.ms1.rt.v.tmp)<=0)) next ## skip a singleton peak without MS2
+      #       if (k.ms1.int.ratio < 3) next ## ratio is too small
+      #       yes.single <- which( raw.ECI.rt.single>=low.single & raw.ECI.rt.single<=high.single )
+      #       int.yes.single <- raw.ECI.single[[2]][yes.single]
+      #       peak.scan.num <- raw.ECI.single[[1]][yes.single][which.max(int.yes.single)]
+      #       peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.single-2)/charge,
+      #                                                    (mono.single+10)/charge) )
+      #       mono.check.single <- checkChargeAndMonoMass( peak.scan, mono.single, charge, mz.ppm.cut,
+      #                                                   predicted.dist)
+      #       lines(c(low.single,low.single),ylimit/2,col="green")
+      #       lines(c(high.single,high.single),ylimit/2,col="green")
+      #       text(mean(c(low.single,high.single)),max(int.yes.single)*1.2, labels=paste(round(singleton.ratio,2),round(mono.check.single,2),sep="/"))
+      #       ## did not pass env score filter
+      #       if (mono.check.single < env.score.cutoff) next
+      #       npoints.single <- length(yes.single)
+      #       ## peak is too narrow with very few time points
+      #       if (npoints.single<minimum.peak.points) next
+      #       ##
+      #       i.ratios[j] <- singleton.ratio
+      #       r2.v[j] <- 1.0
+      #       plot(0,0,xlab="",ylab="",main=paste("Singleton Peak Found !!!"),col.main="red" )
+      #       plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+      #       n.singleton.peaks <- c(n.singleton.peaks,ns)
+      #       break
+      #     }
+      #   }
+      #   if (length(n.singleton.peaks) == 0) {
+      #     plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+      #     plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+      #   }
+      #} else {
         ##plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
-        plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
-        plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
-      }
+      plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+      plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
+      #}
     }
     l.ratios[j] <- paste(n.ms2.peaks, n.candidate.peaks,
                          format(max(k.ms1.int.light.v), digits=1, scientific=T),
