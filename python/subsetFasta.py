@@ -20,9 +20,11 @@ match = False
 for line in open(argv[1]):
     line = line.rstrip()
     if line[0]=='>':
+        if line.find("Reverse") == 1:
+            break
         match = False
         for tag in tags:
-            if line.find(tag) == 1:
+            if line.find(tag) > 0:
                 match = True
                 tags.remove(tag) # keep the first entry
                 break
