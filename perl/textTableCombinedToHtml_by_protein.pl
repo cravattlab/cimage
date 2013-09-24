@@ -22,6 +22,8 @@ for ($i=0; $i<$ncol; ++$i) {
     }
 }
 
+$hostname = `hostname`;
+$hostname = "$hostname.scripps.edu";
 
 $outhtml="$ARGV[0].html";
 ##$outhtml =~ s/\.txt$/\.html/g;
@@ -43,7 +45,7 @@ table#sample TD {
 <BODY>
 ENDOFHEADER
 
-print OUTFILE "<A HREF=\"http://137.131.5.161/cgi-bin/chuquest/batch_annotate.pl?dset=$cwd/$intable\">Gabe's Uniprot Batch Annotation</A><BR><BR>\n";
+print OUTFILE "<A HREF=\"http://$hostname/cgi-bin/chuquest/batch_annotate.pl?dset=$cwd/$intable\">Gabe's Uniprot Batch Annotation</A><BR><BR>\n";
 print OUTFILE "<A HREF=\"$ARGV[0]\.png\">Ratio Plot</A><BR><BR>\n";
 if( -e "$ARGV[0].vennDiagram.png" ) {
     print OUTFILE "<A HREF=\"$ARGV[0]\.vennDiagram\.png\">Venn Diagram</A><BR><BR>\n";
@@ -94,7 +96,7 @@ for ($i=0; $i<$ncol; ++$i) {
     if ( $line1[$i] eq ' ' ) {
 	print OUTFILE "<TH bgcolor=\"HoneyDew\"> \n";
 } else {
-    print OUTFILE "<TH bgcolor=\"HoneyDew\"><A HREF=\"http://137.131.5.161/cgi-bin/chuquest/cimage_sort_table.pl?dset=$dset&colname=$header[$i]&ascending=True\" style=\"text-decoration:none\">^</A> <A HREF=\"http://137.131.5.161/cgi-bin/chuquest/cimage_sort_table.pl?dset=$dset&colname=$header[$i]&ascending=False\" style=\"text-decoration:none\">v</A>\n";
+    print OUTFILE "<TH bgcolor=\"HoneyDew\"><A HREF=\"http://$hostname/cgi-bin/chuquest/cimage_sort_table.pl?dset=$dset&colname=$header[$i]&ascending=True\" style=\"text-decoration:none\">^</A> <A HREF=\"http://$hostname/cgi-bin/chuquest/cimage_sort_table.pl?dset=$dset&colname=$header[$i]&ascending=False\" style=\"text-decoration:none\">v</A>\n";
 }
 }
 print OUTFILE "<TBODY>\n";
