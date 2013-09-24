@@ -24,7 +24,13 @@ uniq.tryptic.sequence <- function( raw.sequence ) {
     }
     uniq.seq.vec <- seq.vec[(start+1):(end-1)]
     if (length(uniq.seq.vec) == 3 ) { ## only two residues long, return the whole sequence
-      return( strsplit(raw.sequence,".",fixed=T)[[1]][2] )
+      xxseq <- strsplit(raw.sequence,".",fixed=T)[[1]][2]
+      xxseq.vec <- unlist(strsplit(xxseq,""))
+      if (length(label.pos) == 1) {
+        return( paste(xxseq.vec[xxseq.vec != "*"], sep="", collapse=""))
+      } else {
+        return( xxseq )
+      }
     }
     if ( length(label.pos) == 1 ) {
       return( paste( uniq.seq.vec[uniq.seq.vec != "*"],sep="",collapse="") )
@@ -40,7 +46,7 @@ args <- commandArgs(trailingOnly=T)
 input.file <- args[1]
 dirs <- args[-1]
 table <- as.list(dirs)
-r2.cutoff <- 0.8
+r2.cutoff <- 0.7
 
 ## read in the first table and figure out headers
 tmp.table <- read.table(paste(dirs[1],input.file,sep=""),header=T,sep="\t",quote="",comment.char="")
@@ -56,8 +62,10 @@ vn3 <- paste("R2.set_",seq(1,nset),sep="")
 v4 <- which(substr(tmp.names,1,4) == "INT.")
 vn4 <- paste("INT.set_",seq(1,nset),sep="")
 
+nrun <- length(dirs)
+
 all.table <- NULL
-for (i in 1:length(dirs) ) {
+for (i in 1:nrun ) {
   table[[i]] <- read.table(paste(dirs[i],input.file,sep=""),header=T,sep="\t",quote="",comment.char="")
   names(table[[i]])[c(v1,v2,v3,v4)] <- c(vn1,vn2,vn3,vn4)
   table[[i]][,"sequence"] <- as.character( table[[i]][,"sequence"] )
@@ -101,26 +109,49 @@ for (uniq in levels(as.factor(all.table$uniq) ) ) {
   s5 <- -sub.table[,"filter"]
   s3 <- sub.table[,"charge"]
   s4 <- sub.table[,"segment"]
+  s6 <- sub.table[,"run"]
 
-  ii <- order(s1,s2,s5,s3,s4)
+  ii <- order(s6,s1,s2,s5,s3,s4)
   count <- count+1
   link.list[[count]] <- which(match)[ii]
 
   pass <- sub.table$filter>=1
   out.char.matrix[count,"index"] <- as.character(count)
   out.char.matrix[count,"sequence"] <- as.character(uniq)
-  out.char.matrix[count,"run"] <- paste(levels(as.factor(sub.table[,"run"])),sep="",collapse="")
-  out.char.matrix[count,"charge"] <- paste(levels(as.factor(sub.table[,"charge"])),sep="",collapse="")
-  out.char.matrix[count,"segment"] <- paste(levels(as.factor(sub.table[,"segment"])),sep="",collapse="")
+ # out.char.matrix[count,"run"] <- paste(levels(as.factor(sub.table[,"run"])),sep="",collapse="")
+ # out.char.matrix[count,"charge"] <- paste(levels(as.factor(sub.table[,"charge"])),sep="",collapse="")
+ # out.char.matrix[count,"segment"] <- paste(levels(as.factor(sub.table[,"segment"])),sep="",collapse="")
+  if (sum(pass)>=1) {
+    out.char.matrix[count,"run"] <- paste(levels(as.factor(sub.table[pass,"run"])),sep="",collapse="")
+    out.char.matrix[count,"charge"] <- paste(levels(as.factor(sub.table[pass,"charge"])),sep="",collapse="")
+    out.char.matrix[count,"segment"] <- paste(levels(as.factor(sub.table[pass,"segment"])),sep="",collapse="")
+  } else {
+    out.char.matrix[count,"run"] <- paste(levels(as.factor(sub.table[,"run"])),sep="",collapse="")
+    out.char.matrix[count,"charge"] <- paste(levels(as.factor(sub.table[,"charge"])),sep="",collapse="")
+    out.char.matrix[count,"segment"] <- paste(levels(as.factor(sub.table[,"segment"])),sep="",collapse="")
+  }
   for ( k in 1:nset ) {
     kk <- k + nset
-    out.num.matrix[count,k]  <- round(median(sub.table[pass,vn1[k]],na.rm=T),digits=2)
-    out.num.matrix[count,kk] <- round(sd(sub.table[pass,vn1[k]],na.rm=T),digits=2)
+    if (nrun >1) {
+      median.per.run <- rep(0,length=nrun)
+      for (dd in 1:nrun) {
+        median.per.run[dd] <- round(median(sub.table[pass&(sub.table[,"run"]==dd),vn1[k]],na.rm=T),digits=2)
+#        if (median.per.run[dd] == 0) {median.per.run[dd] <- NA}
+      }
+      nrun.valid <- sum( !is.na(median.per.run))
+      out.num.matrix[count,k]  <- round(mean(median.per.run,na.rm=T),digits=2)
+      out.num.matrix[count,kk] <- round(sd(median.per.run,na.rm=T)+0.01*(nrun.valid-1),digits=2) ## to differentiate multiple 15 ratios from single replicate
+    } else  {
+      out.num.matrix[count,k]  <- round(median(sub.table[pass,vn1[k]],na.rm=T),digits=2)
+      out.num.matrix[count,kk] <- round(sd(sub.table[pass,vn1[k]],na.rm=T),digits=2)
+    }
+
   }
 }
 
 ## order by ratio from last set to first set
-z.order <- do.call("order", data.frame(out.num.matrix[,seq(nset,1)]))
+#z.order <- do.call("order", data.frame(out.num.matrix[,seq(nset,1)]))
+z.order <- order(data.frame(out.num.matrix[,seq(nset,1)]), decreasing = T)
 
 ## draw venn diagrams of averaged ratios
 if (nset <=3 ) {
