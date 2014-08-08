@@ -8,7 +8,8 @@ fi
 
 cd $1
 
-hst=$(hostname)
+hst="bfclabcomp4"
+#$(hostname)
 
 wd=$(pwd)
 echo current working dir: $wd
@@ -20,7 +21,7 @@ echo current working dir: $wd
 #fi
 
 rhost="www.scripps.edu"
-rdir="/web/docs/chemphys/cravatt/cimage/tempul/"
+rdir="/web/docs/cravatt/cimage/tempul/"
 
 out="temp"
 #echo compress txt, html and png files into $out.zip
@@ -31,13 +32,13 @@ if ! grep public_html $out.txt; then
     exit -1
 fi
 
-find -L ./ -name "combine*.html" >> $out.txt
+find -L ./ -name "combine*.html" | sort >> $out.txt
 chmod a+rw $out.txt
 
-echo transfer $out.txt to server \(use your TSRI password\)
-rsync -ar $out.txt $rhost:$rdir
+echo transfer $out.txt to server $rhost:$rdir\(use your TSRI password\)
+rsync -avzr $out.txt $rhost:$rdir
 
 echo transfer complete! Add it to CIMAGE database at URL below!
-echo http://www.scripps.edu/chemphys/cravatt/cimage/
+echo http://www.scripps.edu/cravatt/cimage/
 
 exit 0

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ $# -lt 1 ]; then
-    echo Usage: $0 [by_protein] [exclude_singleton] text_file dir1 ...
+    echo Usage: $0 [by_protein] [exclude_singleton] [descending]  text_file dir1 ...
     exit -1
 fi
 
@@ -16,7 +16,23 @@ if [ $1 == "exclude_singleton" ]; then
     shift
 fi
 
-tmptxt=$(echo $1 | cut -c1-7)
+descending=""
+if [ $1 == "descending" ]; then
+    descending=$1
+    shift
+fi
+
+# filter by my_list.txt
+mylist=$(find ./ -name "my_list.txt" 2> /dev/null | wc -l)
+if [ "$mylist" -eq 1 ];
+then
+    echo User provides a customized list in my_list.txt -- filtering...
+    listpath=$(find $PWD -name "my_list.txt")
+else
+    listpath="mylist_none"
+fi
+
+tmptxt=$(echo $1 | cut -c1-9)
 if [ $tmptxt == "output_rt" ]; then
     txt=$1
     shift
@@ -39,7 +55,8 @@ nchar=$(echo $outname | wc -c)
 ##fi
 
 if [ "$by_protein" == "by_protein" ]; then
-    R --vanilla --args $exclude_singleton $txt $dirs < $CIMAGE_PATH/R/combined_by_protein.R > $outname.by_protein.Rout
+    echo "R --vanilla --args $exclude_singleton $descending $listpath $txt $dirs < $CIMAGE_PATH/R/combined_by_protein.R > $outname.by_protein.Rout"
+    R --vanilla --args $exclude_singleton $descending $listpath $txt $dirs < $CIMAGE_PATH/R/combined_by_protein.R > $outname.by_protein.Rout
 else
     R --vanilla --args $txt $dirs < $CIMAGE_PATH/R/combined.R > $outname.Rout
 fi

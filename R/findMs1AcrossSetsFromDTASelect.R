@@ -1,4 +1,4 @@
-library(xcms)
+suppressPackageStartupMessages(library(xcms))
 cimage.path <- Sys.getenv("CIMAGE_PATH")
 source(paste(cimage.path,"/R/inputparams.R",sep=""))
 source(paste(cimage.path,"/R/msisotope.R",sep=""))
@@ -46,7 +46,7 @@ cross.table <- cbind(cross.table, split.table)
 uniq.ipi.peptides <- as.factor(paste(cross.table[,"ipi"], cross.table[,"peptide"],sep=":"))
 entry.levels <- levels( uniq.ipi.peptides )
 ## all_scan.table
-all.scan.table <- read.table("all_scan.table", header=T, as.is=T,comment.char="")
+all.scan.table <- read.table("all_scan.table", header=T, as.is=T,comment.char="",colClasses=c("character","character","numeric","character"))
 ## file name tags
 cross.vec <- as.character(args)
 ncross <- length(cross.vec)
@@ -118,7 +118,7 @@ layout.matrix <- matrix(layout.vec,byrow=T,ncol=3)
 layout(layout.matrix)
 par(oma=c(0,0,5,0), las=0)
 
-##for ( i in 2748:2748) {
+##for ( i in 2304:2304) {
 for ( i in 1:dim(cross.table)[1] ) {
   key <- cross.table[i,"key"]
   tmp.vec <- unlist( strsplit(as.character(key),":") )
@@ -134,13 +134,17 @@ for ( i in 1:dim(cross.table)[1] ) {
   mono.mass <- calc.peptide.mass( peptide, light.aa.mass)
   #predicted.dist <- isotope.dist( averagine.count(mono.mass) )
   elements.count <- calc.num.elements(peptide, light.chem.table)
+  #number of heavy atoms already in the light table, to calculate envelope distribution properly
+  n.heavyatoms <- sum(elements.count[c("N15","H2","C13")])
   predicted.dist <- isotope.dist(elements.count)
+  if (n.heavyatoms>0) {predicted.dist <- predicted.dist[-c(1:n.heavyatoms)]}
   i.max <- which.max(predicted.dist)
   mass <- mono.mass + (i.max - 1)*isotope.mass.unit
   mono.mass.heavy <- calc.peptide.mass( peptide, heavy.aa.mass)
   mass.heavy <- mono.mass.heavy + mass - mono.mass
   elements.count.heavy <- calc.num.elements(peptide, heavy.chem.table)
   predicted.dist.heavy <- isotope.dist(elements.count.heavy,N15.enrichment)
+  if (n.heavyatoms>0){predicted.dist.heavy <- predicted.dist.heavy[-c(1:n.heavyatoms)]}
   ## mass delta between light and heavy
   mass.shift <- sum((elements.count.heavy-elements.count)[c("N15","H2","C13")])
   correction.factor <- predicted.dist[i.max]/predicted.dist.heavy[i.max+mass.shift]
@@ -286,16 +290,16 @@ for ( i in 1:dim(cross.table)[1] ) {
 
         peak.scan.num <- raw.ECI.light[[1]][yes][which.max(light.yes)]
         if ( mass.shift > 0 ) {
-          peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.mass-2)/charge, mz.heavy) )
+          peak.scan <- getScan(xfile, peak.scan.num, mzrange=c((mono.mass-2)/charge, mz.heavy) )
         } else {
-          peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.mass-2)/charge, mz.heavy+5) )
+          peak.scan <- getScan(xfile, peak.scan.num, mzrange=c((mono.mass-2)/charge, mz.heavy+5) )
         }
         mono.check <- checkChargeAndMonoMass( peak.scan, mono.mass, charge, mz.ppm.cut, predicted.dist)
         ## calculate ratio of integrated peak area
         if (HL.ratios[j]) {
           ratio <- round((sum(heavy.yes)/sum(light.yes))*correction.factor,digits=2)
           peak.scan.num <- raw.ECI.heavy[[1]][yes][which.max(heavy.yes)]
-          peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.mass.heavy-2)/charge, mz.heavy+5) )
+          peak.scan <- getScan(xfile, peak.scan.num, mzrange=c((mono.mass.heavy-2)/charge, mz.heavy+5) )
           mono.check.heavy <- checkChargeAndMonoMass( peak.scan, mono.mass.heavy, charge, mz.ppm.cut, predicted.dist.heavy[(mass.shift+1):length(predicted.dist.heavy)])
           mono.check <- max(mono.check, mono.check.heavy)
         } else {
@@ -393,7 +397,7 @@ for ( i in 1:dim(cross.table)[1] ) {
 
       mz.max <- predicted.mz[n.max]
       mass.range <- c(mono.mz-2*mz.unit, mz.heavy+8*mz.unit)
-      scan.data <- getScan(xfile, best.peak.scan.num, massrange=mass.range)
+      scan.data <- getScan(xfile, best.peak.scan.num, mzrange=mass.range)
       scan.mz <- scan.data[,"mz"]
       scan.int <- scan.data[,"intensity"]
       observed.int <- predicted.mz
@@ -462,7 +466,7 @@ for ( i in 1:dim(cross.table)[1] ) {
             yes.single <- which( raw.ECI.rt.single>=low.single & raw.ECI.rt.single<=high.single )
             int.yes.single <- raw.ECI.single[[2]][yes.single]
             peak.scan.num <- raw.ECI.single[[1]][yes.single][which.max(int.yes.single)]
-            peak.scan <- getScan(xfile, peak.scan.num, massrange=c((mono.single-2)/charge,
+            peak.scan <- getScan(xfile, peak.scan.num, mzrange=c((mono.single-2)/charge,
                                                          (mono.single+10)/charge) )
             mono.check.single <- checkChargeAndMonoMass( peak.scan, mono.single, charge, mz.ppm.cut,
                                                         predicted.dist)
@@ -477,22 +481,26 @@ for ( i in 1:dim(cross.table)[1] ) {
             text(mean(c(low.single,high.single)),max(int.yes.single)*1.2, labels=paste(round(singleton.ratio,2),round(mono.check.single),sep="/"))
             i.ratios[j] <- singleton.ratio
             r2.v[j] <- 1.0
-            plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+            plot(0,0,xlab="",ylab="",main=paste(npoints.single, " MS1s in this peak", sep="") )
             plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
             n.singleton.peaks <- c(n.singleton.peaks,ns)
             break
           }
         }
         if (length(n.singleton.peaks) == 0) {
-          plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+          plot(0,0,xlab="",ylab="",main=paste("No singleton peak found") )
           plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
         }
       } else {
         ##plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
-        plot(0,0,xlab="",ylab="",main=paste("R2 value: 0.00") )
+        plot(0,0,xlab="",ylab="",main=paste("Singleton detection off") )
         plot(0,0,xlab="",ylab="",main=paste("Empty ms1 spectrum") )
       }
     }
+    if (mass.shift==0) {
+      i.ratios[j] <- 0.0
+      r2.v[j] <- 0.0
+    } ## for non-isotopic peptides, assign ratios to zero
     l.ratios[j] <- paste(n.ms2.peaks, n.candidate.peaks,
                          format(max(k.ms1.int.light.v), digits=1, scientific=T),
                          format(noise.light, digits=1, scientific=T),

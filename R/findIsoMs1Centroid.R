@@ -27,7 +27,7 @@ output.file.suffix <- ".png"
 # within 10sec of retention window
 rt.cut <- 10.0
 # ppm
-mz.ppm.cut <- 0.000025 # 25ppm
+mz.ppm.cut <- 0.000025*2 # 25ppm
 # From Eranthie's isotopically labeled probe
 ##pair.mass.delta <- 6.01381
 ## From Sussana's silac data
@@ -264,12 +264,14 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   peaks.mz2 <- as.numeric(pair.list.this.id[,"mz2"])
   ## most intense peak position in the light envelope
   i <- which.max(peaks.maxo1)
-  envelope1 <- abs( (peaks.mz1-peaks.mz1[i])/isotope.mz.delta )
-  envelope2 <- abs( (peaks.mz2-peaks.mz2[i])/isotope.mz.delta )
-  envelope.check <- (abs(envelope1-round(envelope1))/peaks.mz1[i] < mz.ppm.cut &
-                     abs(envelope2-round(envelope2))/peaks.mz2[i] < mz.ppm.cut &
-                     round(envelope1) <= 4 &
-                     round(envelope2) <= 4)
+  isotope.shifter1 <- round( (peaks.mz1-peaks.mz1[i])/isotope.mz.delta )
+  isotope.shifter2 <- round( (peaks.mz2-peaks.mz2[i])/isotope.mz.delta )
+  envelope1 <- peaks.mz1[i]+isotope.shifter1*isotope.mz.delta
+  envelope2 <- peaks.mz2[i]+isotope.shifter2*isotope.mz.delta
+  envelope.check <- ((abs(peaks.mz1-envelope1)/peaks.mz1) < mz.ppm.cut &
+                     (abs(peaks.mz2-envelope2)/peaks.mz2) < mz.ppm.cut &
+                     isotope.shifter1 <= 4 &
+                     isotope.shifter2 <= 4)
   pair.list.this.id <- pair.list.this.id[envelope.check,]
   peaks.mz1 <- as.numeric(pair.list.this.id[,"mz1"])
   peaks.mz2 <- as.numeric(pair.list.this.id[,"mz2"])
@@ -348,10 +350,11 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
   ## plot chromatogram of the most intense peak,
   ## label others under the same envelope
   ## most intense peak position in the light envelope
-  i <- which.max(peaks.maxo1)
   if ( max(peaks.maxo1) > max(peaks.maxo2) ) {
+    i <- which.max(peaks.maxo1)
     rt <- as.numeric( pair.list.this.id[i,"rt1"] )
   } else {
+    i <- which.max(peaks.maxo2)
     rt <- as.numeric( pair.list.this.id[i,"rt2"] )
   }
   ##rt <- ( as.numeric(pair.list.this.id[i,"rt1"]) + as.numeric(pair.list.this.id[i,"rt2"]) ) / 2.0
@@ -448,11 +451,13 @@ for ( id in levels(factor(pair.list[,"hit.id"])) ) {
          "and", as.character(format(peak.mz2,digits=7)), "m/z"), xlim=xlimit, ylim=ylimit)
   lines(raw.ECI.heavy[[1]], raw.ECI.heavy[[2]], col='blue', xlim=xlimit, ylim=ylimit)
   peak.mz1.i <- which( abs(predicted.mz-peak.mz1)/peak.mz1 < 2*mz.ppm.cut )
+  if (length(peak.mz1.i)>1) { peak.mz1.i <- peak.mz1.i[1] } # if this happens, we have trouble matching peak.mz1 to predicted.mz unambiguously
   ms2.yes <- which( predicted.mz.ms2[,peak.mz1.i] > 0 )
   ms2.yes.scan.num <- as.integer(dimnames(predicted.mz.ms2)[[1]][ms2.yes])
   points( ms2.yes.scan.num, raw.ECI.light[[2]][raw.ECI.light[[1]]%in%ms2.yes.scan.num],
          type='p', pch=8, col="red")
   peak.mz2.i <- which( abs(predicted.mz-peak.mz2)/peak.mz2 < 2*mz.ppm.cut )
+  if (length(peak.mz2.i)>1) { peak.mz2.i <- peak.mz2.i[1] }
   ms2.yes <- which( predicted.mz.ms2[,peak.mz2.i] > 0 )
   ms2.yes.scan.num <- as.integer(dimnames(predicted.mz.ms2)[[1]][ms2.yes])
   points( ms2.yes.scan.num, raw.ECI.heavy[[2]][raw.ECI.heavy[[1]]%in%ms2.yes.scan.num],

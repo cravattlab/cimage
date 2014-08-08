@@ -37,10 +37,25 @@ uniq.tryptic.sequence <- function( raw.sequence ) {
 ## file name from input args
 args <- commandArgs(trailingOnly=T)
 exclude.singleton <- F
+descending <- F
+mylist <- ""
+use.mylist <- F
 if ( args[1] == "exclude_singleton" ) {
   exclude.singleton <- T
   args <- args[-1]
 }
+if ( args[1] == "descending" ) {
+  descending <- T
+  args <- args[-1]
+}
+if ( args[1] == "mylist_none" ) {
+  use.mylist <- F
+} else {
+  use.mylist <- T
+  mylist <- read.table(args[1],header=F)
+}
+args <- args[-1]
+
 input.file <- args[1]
 dirs <- args[-1]
 table <- as.list(dirs)
@@ -71,7 +86,11 @@ for (i in 1:length(dirs) ) {
   all.table<-rbind(all.table, table[[i]])
 }
 all.table$uniq <- all.table$ipi
-
+if (use.mylist) {
+  entries <- mylist[,1]
+} else {
+  entries <- all.table$uniq
+}
 ## set to NA if not passing r2.cutoff
 for( i in 1:length(vn1) ) {
   invalid <- (all.table[[vn3[i]]]<r2.cutoff)
@@ -84,17 +103,18 @@ for( i in 1:nrow(all.table) ) {
 
 sp=" "
 count <- 0
-link.list <- as.list( levels(as.factor(all.table$uniq) ) )
+link.list <- as.list( levels(as.factor(entries) ) )
 nuniq <- length(link.list)
 out.num.matrix <- matrix(0 ,nrow=nuniq,ncol=4*nset)
 colnames(out.num.matrix) <- c( paste("mr.set_",seq(1,nset),sep=""), paste("sd.set_",seq(1,nset),sep=""),paste("mean.set_",seq(1,nset),sep=""), paste("noqp.set_",seq(1,nset),sep=""))
 char.names <- c("index","ipi", "description", "symbol", "sequence", "mass", "run", "charge", "segment", "link")
 out.char.matrix <- matrix(" ",nrow=nuniq,ncol=length(char.names))
 colnames(out.char.matrix) <- char.names
-for (uniq in levels(as.factor(all.table$uniq) ) ) {
+for (uniq in levels(as.factor(entries) ) ) {
   ##ipi <- strsplit(uniq,":")[[1]][1]
   ##seq <- strsplit(uniq,":")[[1]][2]
   match <- all.table[,"uniq"] == uniq  ##(all.table[,"sequence"]==seq) & (all.table$ipi==ipi)
+  if (sum(match) == 0 ) next
   sub.table <- all.table[match,]
   s1 <- sub.table[,"ipi"]
   s2 <- sub.table[,"sequence"]
@@ -144,10 +164,13 @@ for (uniq in levels(as.factor(all.table$uniq) ) ) {
     }
   }
 }
-
+if (nuniq > count) {
+  out.num.matrix <- out.num.matrix[-seq(count+1,nuniq),]
+  out.char.matrix <- out.char.matrix[-seq(count+1,nuniq),]
+}
 ## order by ratio from last set to first set
-z.order <- do.call("order", data.frame(out.num.matrix[,seq(nset,1)]))
-
+#z.order <- do.call("order", data.frame(out.num.matrix[,seq(nset,1)]))
+z.order <- order(data.frame(out.num.matrix[,seq(nset,1)]),decreasing=descending)
 ## draw venn diagrams of averaged ratios
 if (nset <=3 ) {
   library(limma)
@@ -216,7 +239,7 @@ write.table(html.table2,file="combined_averaged_ratios.txt", quote=F, sep="\t", 
 
 png("combined.png")
 ratio <- out.num.matrix[z.order,]
-valid <- rep(T,nuniq)
+valid <- rep(T,count)
 for ( i in 1:nset) {
   valid <- valid & !is.na(ratio[,i])
 }
