@@ -1,0 +1,9 @@
+
+# /xcms_1.14.1/inst/doc/
+/xcms_1.14.1/inst/doc/*.pdf
+
+# /xcms_1.14.1/inst/doc/example_box/
+/xcms_1.14.1/inst/doc/example_box/*.png
+
+# /xcms_1.14.1/inst/doc/example_eic/
+/xcms_1.14.1/inst/doc/example_eic/*.png
