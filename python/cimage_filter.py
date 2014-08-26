@@ -23,7 +23,7 @@ for line in open(argv[1]):
 match = True
 
 for line in open(argv[2]):
-    line = line.rstrip()
+#    line = line.rstrip()
     if line[0]!=' ' and line[0]!='i':
         match = False
         for tag in tags:
@@ -33,6 +33,6 @@ for line in open(argv[2]):
                 break
 
     if match:
-        print line
+        print line,
 
 
