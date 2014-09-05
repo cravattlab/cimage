@@ -26,6 +26,7 @@ print OUTFILE <<ENDOFHEADER;
         font-size: 10px;
     }
 </STYLE>
+<script data-main="/~github/cimage-clientpatches/main" src="/~github/cimage-clientpatches/vendor/require.js" type="text/javascript"></script>
 ENDOFHEADER
 print OUTFILE "<TABLE border=2 frame=\"border\" rules=\"groups\" summary=$intable>\n";
 ##print OUTFILE "<CAPTION> <b>$title</b> </CAPTION>\n";
