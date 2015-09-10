@@ -156,6 +156,15 @@ for (uniq in levels(as.factor(entries) ) ) {
       out.num.matrix[count,kk] <- round(sd(sub.table[pass2,vn1[k]],na.rm=T),digits=2)
       out.num.matrix[count,kkk]  <- round(mean(sub.table[pass2,vn1[k]],na.rm=T),digits=2)
       out.num.matrix[count,kkkk] <- sum(pass2)
+
+      ## apply filter for when there're exactly 2 quantified peptides
+      ## and one is 20 but the other is < 3. Set the median ratio to the lower value
+      if (sum(pass2) == 2){
+        if( (max(sub.table[pass2,vn1[k]]) == 20.00) & (min(sub.table[pass2,vn1[k]]) < 3.00) ){
+           out.num.matrix[count,k] <- round(min(sub.table[pass2,vn1[k]],na.rm=T),digits=2)
+        }
+      }
+
     } else {
       out.num.matrix[count,k]  <- round(median(sub.table[pass,vn1[k]],na.rm=T),digits=2)
       out.num.matrix[count,kk] <- round(sd(sub.table[pass,vn1[k]],na.rm=T),digits=2)

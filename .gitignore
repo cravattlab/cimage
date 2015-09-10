@@ -7,3 +7,5 @@
 
 # /xcms_1.14.1/inst/doc/example_eic/
 /xcms_1.14.1/inst/doc/example_eic/*.png
+
+*.pyc
