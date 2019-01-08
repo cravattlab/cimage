@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# this is the row number that contains the header information for each
+# individual entry in a DTASelect file
+ENTRY_HEADER_ROW_NUM=29
+
 if [ $# -lt 1 ]; then
     echo Usage: $0 cimage.params [no_png] set_1 set_2 ...
     exit -1
@@ -51,7 +55,20 @@ do
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | sed 's/^cimagepep\-//g' | sed 's/IPI://g' | sed 's/'sp\|'//g' | sed 's/'tr\|'//g' | awk '{print $1}' > $p2.tmp.ipi
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk '{print $2}' > $p2.tmp.FileName
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk -v HL=$HL '{print $3, HL}' > $p2.tmp.xcorr
-	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk '{print $NF}' > $p2.tmp.peptide
+
+	# get the number of the sequence column
+	# added here because DTASelect output from IP2 changed
+	# several additional columns were added containg PTM information
+	# which made it so that the sequence information is no longer last
+	# in the file
+	sequenceColumNumber=$(sed "${ENTRY_HEADER_ROW_NUM}q;d" "${p2}" | awk -v RS='\t' '/Sequence/{print NR; exit}')
+
+	if [ -z "$sequenceColumNumber" ]; then
+		echo "Could not find column number for sequence!"
+		exit 1
+	fi
+
+	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk -v seqColNum="${sequenceColumNumber}" '{print $seqColNum}' > $p2.tmp.peptide
 	cat $p2.tmp.peptide | sed 's/\*//g' | sed 's/\#//g' | sed 's/\@//g' | cut -f2 -d \.  > $p2.tmp.sequence
 	for p3 in $(cat $p2.tmp.sequence | sort | uniq )
 	do
