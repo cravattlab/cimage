@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# this is the row number that contains the header information for each
-# individual entry in a DTASelect file
-ENTRY_HEADER_ROW_NUM=29
-
 if [ $# -lt 1 ]; then
     echo Usage: $0 cimage.params [no_png] set_1 set_2 ...
     exit -1
@@ -56,15 +52,25 @@ do
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk '{print $2}' > $p2.tmp.FileName
 	cat $p2.tagged | grep ^cimagepep | grep $p1 | awk -v HL=$HL '{print $3, HL}' > $p2.tmp.xcorr
 
-	# get the number of the sequence column
-	# added here because DTASelect output from IP2 changed
+	# below added here because DTASelect output from IP2 changed
 	# several additional columns were added containg PTM information
 	# which made it so that the sequence information is no longer last
 	# in the file
-	sequenceColumNumber=$(sed "${ENTRY_HEADER_ROW_NUM}q;d" "${p2}" | awk -v RS='\t' '/Sequence/{print NR; exit}')
+
+	# this is the row number that contains the header information for each
+	# individual entry in a DTASelect file
+	entryHeaderRowNum=$(awk '/Unique\s+FileName/ {print FNR; exit;}' "${p2}")
+
+	if [ -z "$entryHeaderRowNum" ]; then
+		echo "ERROR: Could not find header row!"
+		exit 1
+	fi
+
+	# get the number of the sequence column
+	sequenceColumNumber=$(sed "${entryHeaderRowNum}q;d" "${p2}" | awk -v RS='\t' '/Sequence/{print NR; exit}')
 
 	if [ -z "$sequenceColumNumber" ]; then
-		echo "Could not find column number for sequence!"
+		echo "ERROR: Could not find column number for sequence!"
 		exit 1
 	fi
 
